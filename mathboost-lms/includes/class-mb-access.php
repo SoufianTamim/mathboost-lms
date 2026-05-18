@@ -21,6 +21,23 @@ class MB_Access {
     }
 
     public static function get_qcm_list_with_access( int $category_id ): array {
+        if ( MB_Migrator::is_done() ) {
+            $qcms       = MB_QCM_Repository::get_by_category( $category_id );
+            $is_premium = self::current_user_is_premium();
+            $items      = [];
+
+            foreach ( $qcms as $qcm ) {
+                $is_locked = false;
+                if ( ! $is_premium && ! current_user_can( 'manage_options' ) ) {
+                    $is_locked = (bool) $qcm->is_locked;
+                }
+                $items[] = [ 'qcm' => $qcm, 'is_locked' => $is_locked ];
+            }
+
+            return $items;
+        }
+
+        // ── Legacy WP path (pre-migration) ────────────────────────────────────
         $query = new WP_Query( [
             'post_type'      => 'mb_qcm',
             'posts_per_page' => -1,
@@ -39,8 +56,7 @@ class MB_Access {
         $locked_count = (int) get_option( 'mb_free_locked_count', 3 );
         $is_premium   = self::current_user_is_premium();
         $items        = [];
-
-        $free_count = max( 0, $total - $locked_count );
+        $free_count   = max( 0, $total - $locked_count );
 
         foreach ( $posts as $index => $post ) {
             $is_locked = false;
@@ -54,7 +70,7 @@ class MB_Access {
                     $is_locked = $index >= $free_count;
                 }
             }
-            $items[] = [ 'post' => $post, 'is_locked' => $is_locked ];
+            $items[] = [ 'post' => $post, 'qcm' => null, 'is_locked' => $is_locked ];
         }
 
         return $items;
@@ -65,7 +81,12 @@ class MB_Access {
             return false;
         }
 
-        // Explicit per-QCM lock overrides position-based logic
+        if ( MB_Migrator::is_done() ) {
+            $qcm = MB_QCM_Repository::get_by_id( $qcm_id );
+            return $qcm ? (bool) $qcm->is_locked : false;
+        }
+
+        // ── Legacy WP path ────────────────────────────────────────────────────
         $explicit = get_post_meta( $qcm_id, '_mb_locked', true );
         if ( $explicit === '1' ) {
             return true;
@@ -74,7 +95,6 @@ class MB_Access {
             return false;
         }
 
-        // Fallback: position-based (last N in category)
         $categories = wp_get_post_terms( $qcm_id, 'mb_category', [ 'fields' => 'ids' ] );
         if ( empty( $categories ) || is_wp_error( $categories ) ) {
             return false;

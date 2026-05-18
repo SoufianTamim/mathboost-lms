@@ -4,7 +4,9 @@ defined( 'ABSPATH' ) || exit;
 class MB_Post_Types {
 
     public static function init() {
-        add_action( 'init', [ __CLASS__, 'register' ] );
+        if ( ! get_option( 'mb_migration_v2_done' ) ) {
+            add_action( 'init', [ __CLASS__, 'register' ] );
+        }
     }
 
     public static function register() {
@@ -31,6 +33,7 @@ class MB_Post_Types {
             'supports'            => [ 'title', 'editor', 'thumbnail', 'revisions' ],
             'rewrite'             => [ 'slug' => 'qcm', 'with_front' => false ],
             'show_in_nav_menus'   => false,
+            'show_in_menu'        => false,
             'capability_type'     => 'post',
         ] );
     }

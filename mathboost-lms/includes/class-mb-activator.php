@@ -58,10 +58,66 @@ class MB_Activator {
             KEY qcm_id (qcm_id)
         ) $charset_collate;";
 
+        // ── Levels ───────────────────────────────────────────────────────────
+        $sql_levels = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}mb_levels (
+            id          BIGINT(20) UNSIGNED  NOT NULL AUTO_INCREMENT,
+            parent_id   BIGINT(20) UNSIGNED           DEFAULT NULL,
+            name        VARCHAR(200)         NOT NULL  DEFAULT '',
+            slug        VARCHAR(200)         NOT NULL  DEFAULT '',
+            description TEXT,
+            color       VARCHAR(50)          NOT NULL  DEFAULT 'teal',
+            menu_order  INT                  NOT NULL  DEFAULT 0,
+            PRIMARY KEY  (id),
+            UNIQUE KEY   slug (slug),
+            KEY          parent_id (parent_id)
+        ) $charset_collate;";
+
+        // ── Categories ────────────────────────────────────────────────────────
+        $sql_categories = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}mb_categories (
+            id          BIGINT(20) UNSIGNED  NOT NULL AUTO_INCREMENT,
+            level_id    BIGINT(20) UNSIGNED           DEFAULT NULL,
+            name        VARCHAR(200)         NOT NULL  DEFAULT '',
+            slug        VARCHAR(200)         NOT NULL  DEFAULT '',
+            description TEXT,
+            menu_order  INT                  NOT NULL  DEFAULT 0,
+            PRIMARY KEY  (id),
+            UNIQUE KEY   slug (slug),
+            KEY          level_id (level_id)
+        ) $charset_collate;";
+
+        // ── QCMs ─────────────────────────────────────────────────────────────
+        $sql_qcms = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}mb_qcms (
+            id          BIGINT(20) UNSIGNED  NOT NULL AUTO_INCREMENT,
+            title       VARCHAR(500)         NOT NULL  DEFAULT '',
+            subtitle    VARCHAR(500)         NOT NULL  DEFAULT '',
+            intro       TEXT,
+            questions   LONGTEXT,
+            is_locked   TINYINT(1)           NOT NULL  DEFAULT 0,
+            menu_order  INT                  NOT NULL  DEFAULT 0,
+            status      VARCHAR(20)          NOT NULL  DEFAULT 'publish',
+            created_at  DATETIME             NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+            updated_at  DATETIME             NOT NULL  DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            KEY          status (status),
+            KEY          menu_order (menu_order)
+        ) $charset_collate;";
+
+        // ── QCM ↔ Category pivot ──────────────────────────────────────────────
+        $sql_qcm_cats = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}mb_qcm_categories (
+            qcm_id      BIGINT(20) UNSIGNED  NOT NULL,
+            category_id BIGINT(20) UNSIGNED  NOT NULL,
+            PRIMARY KEY  (qcm_id, category_id),
+            KEY          category_id (category_id)
+        ) $charset_collate;";
+
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         dbDelta( $sql_codes );
         dbDelta( $sql_sessions );
         dbDelta( $sql_reports );
+        dbDelta( $sql_levels );
+        dbDelta( $sql_categories );
+        dbDelta( $sql_qcms );
+        dbDelta( $sql_qcm_cats );
 
         update_option( 'mb_db_version', MB_VERSION );
     }

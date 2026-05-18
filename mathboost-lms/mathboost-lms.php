@@ -3,7 +3,7 @@
  * Plugin Name:       MathBoost LMS
  * Plugin URI:        https://mathboost.net
  * Description:       Système LMS complet pour QCMs de mathématiques avec freemium, codes d'activation, MathJax, navigation par niveaux/cours/catégories et restriction de sessions.
- * Version:           1.0.2
+ * Version:           2.0.0
  * Author:            MathBoost
  * Author URI:        https://mathboost.net
  * License:           GPL-2.0-or-later
@@ -17,7 +17,7 @@
 defined( 'ABSPATH' ) || exit;
 
 // ── Constants ────────────────────────────────────────────────────────────────
-define( 'MB_VERSION',     '1.0.2' );
+define( 'MB_VERSION',     '2.0.0' );
 define( 'MB_PLUGIN_FILE', __FILE__ );
 define( 'MB_PLUGIN_DIR',  plugin_dir_path( __FILE__ ) );
 define( 'MB_PLUGIN_URL',  plugin_dir_url( __FILE__ ) );
@@ -26,6 +26,10 @@ define( 'MB_TEXT_DOMAIN', 'mathboost-lms' );
 // ── Autoload includes ─────────────────────────────────────────────────────────
 $mb_includes = [
     'includes/class-mb-activator.php',
+    'includes/class-mb-level-repository.php',
+    'includes/class-mb-category-repository.php',
+    'includes/class-mb-qcm-repository.php',
+    'includes/class-mb-migrator.php',
     'includes/class-mb-post-types.php',
     'includes/class-mb-taxonomies.php',
     'includes/class-mb-session-manager.php',
@@ -51,6 +55,13 @@ add_action( 'plugins_loaded', 'mathboost_lms_init' );
 function mathboost_lms_init() {
     load_plugin_textdomain( MB_TEXT_DOMAIN, false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
 
+    // Auto-create/update tables when the plugin is updated via zip (no deactivate/reactivate needed)
+    if ( get_option( 'mb_db_version' ) !== MB_VERSION ) {
+        MB_Activator::activate();
+        update_option( 'mb_db_version', MB_VERSION );
+    }
+
+    MB_Migrator::init();
     MB_Post_Types::init();
     MB_Taxonomies::init();
     MB_Session_Manager::init();

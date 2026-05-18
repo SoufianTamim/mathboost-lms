@@ -4,7 +4,9 @@ defined( 'ABSPATH' ) || exit;
 class MB_Taxonomies {
 
     public static function init() {
-        add_action( 'init', [ __CLASS__, 'register' ] );
+        if ( ! get_option( 'mb_migration_v2_done' ) ) {
+            add_action( 'init', [ __CLASS__, 'register' ] );
+        }
     }
 
     public static function register() {

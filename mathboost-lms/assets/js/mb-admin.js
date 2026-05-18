@@ -17,11 +17,26 @@
         statusEl  = document.getElementById('mb-save-status');
         if (!qList || !jsonField) return;
 
-        // ── Load existing questions ──────────────────────────────────────────
-        var existing = [];
-        try { existing = JSON.parse(jsonField.value || '[]'); } catch (e) {}
-        existing.forEach(function (q) { appendBlock(q); });
-        updateCount();
+        // ── Fetch questions from server on page load ──────────────────────────
+        var pidEl  = document.getElementById('mb_qcm_id') || document.getElementById('post_ID');
+        var postId = pidEl ? (parseInt(pidEl.value, 10) || 0) : 0;
+
+        if (postId) {
+            fetchQuestionsFromServer(postId, function (questions) {
+                if (questions !== null) {
+                    questions.forEach(function (q) { appendBlock(q); });
+                    if (jsonField) jsonField.value = JSON.stringify(questions);
+                } else {
+                    // Server unreachable — fall back to what PHP rendered in the hidden field
+                    loadFromHiddenField();
+                }
+                updateCount();
+            });
+        } else {
+            // New auto-draft with no post_ID yet
+            loadFromHiddenField();
+            updateCount();
+        }
 
         // ── Add-question buttons ─────────────────────────────────────────────
         ['mb-add-q', 'mb-add-q-bottom'].forEach(function (id) {
@@ -78,25 +93,74 @@
         initImportPanel();
     });
 
+    // ── Fetch questions from server ──────────────────────────────────────────
+    // callback(questions[]) on success, callback(null) on failure.
+    function fetchQuestionsFromServer(postId, callback) {
+        var cfg   = window.mbAdmin || {};
+        var url   = cfg.ajaxUrl || window.ajaxurl || '/wp-admin/admin-ajax.php';
+        var nonce = cfg.nonce || '';
+
+        if (!nonce) {
+            // No nonce — can't make authenticated request
+            callback(null);
+            return;
+        }
+
+        if (statusEl) {
+            statusEl.className   = 'mb-save-status';
+            statusEl.textContent = '⏳ Chargement des questions…';
+        }
+
+        $.ajax({
+            url:      url,
+            type:     'POST',
+            dataType: 'json',
+            data: {
+                action:  'mb_get_questions',
+                nonce:   nonce,
+                post_id: postId,
+            },
+            success: function (r) {
+                if (statusEl) statusEl.textContent = '';
+                if (r && r.success) {
+                    callback(r.data.questions || []);
+                } else {
+                    callback(null);
+                }
+            },
+            error: function () {
+                if (statusEl) statusEl.textContent = '';
+                callback(null);
+            },
+        });
+    }
+
+    // ── Load from the PHP-rendered hidden field (fallback) ───────────────────
+    function loadFromHiddenField() {
+        var existing = [];
+        try { existing = JSON.parse((jsonField && jsonField.value) || '[]') || []; } catch (e) {}
+        existing.forEach(function (q) { appendBlock(q); });
+    }
+
     // ── Dirty / saved state ──────────────────────────────────────────────────
     function markDirty() {
         dirty = true;
         if (jsonField) jsonField.value = JSON.stringify(gatherQuestions());
         if (statusEl) {
-            statusEl.className = 'mb-save-status is-unsaved';
+            statusEl.className   = 'mb-save-status is-unsaved';
             statusEl.textContent = '● Modifications non sauvegardées';
         }
     }
 
-    function markSaved() {
+    function markSaved(msg) {
         dirty = false;
         if (statusEl) {
-            statusEl.className = 'mb-save-status is-saved';
-            statusEl.textContent = '✓ Questions sauvegardées';
+            statusEl.className   = 'mb-save-status is-saved';
+            statusEl.textContent = '✓ ' + (msg || 'Questions sauvegardées');
             setTimeout(function () {
                 if (!dirty && statusEl) {
                     statusEl.textContent = '';
-                    statusEl.className = 'mb-save-status';
+                    statusEl.className   = 'mb-save-status';
                 }
             }, 3000);
         }
@@ -104,7 +168,7 @@
 
     function markError(msg) {
         if (statusEl) {
-            statusEl.className = 'mb-save-status is-error';
+            statusEl.className   = 'mb-save-status is-error';
             statusEl.textContent = '✕ ' + (msg || 'Erreur de sauvegarde.');
         }
     }
@@ -119,16 +183,15 @@
     // ── AJAX save ────────────────────────────────────────────────────────────
     function saveViaAjax() {
         var questions = gatherQuestions();
-        var json = JSON.stringify(questions);
+        var json      = JSON.stringify(questions);
         if (jsonField) jsonField.value = json;
 
-        var postId = 0;
-        var pidEl  = document.getElementById('post_ID');
-        if (pidEl) postId = parseInt(pidEl.value, 10) || 0;
+        var pidEl  = document.getElementById('mb_qcm_id') || document.getElementById('post_ID');
+        var postId = pidEl ? (parseInt(pidEl.value, 10) || 0) : 0;
 
         if (!postId) {
             if (statusEl) {
-                statusEl.className = 'mb-save-status is-warning';
+                statusEl.className   = 'mb-save-status is-warning';
                 statusEl.textContent = '⚠ Publiez d\'abord le QCM, puis cliquez Sauvegarder.';
             }
             return;
@@ -136,22 +199,22 @@
 
         if (!questions.length) {
             if (statusEl) {
-                statusEl.className = 'mb-save-status is-warning';
+                statusEl.className   = 'mb-save-status is-warning';
                 statusEl.textContent = '⚠ Aucune question à sauvegarder.';
             }
             return;
         }
 
-        setSaveBtns(true, 'Sauvegarde…');
+        setSaveBtns(true, '⏳ Sauvegarde…');
         if (statusEl) { statusEl.className = 'mb-save-status'; statusEl.textContent = ''; }
 
-        var nonce = (window.mbAdmin && mbAdmin.nonce) ? mbAdmin.nonce : '';
+        var cfg   = window.mbAdmin || {};
+        var url   = cfg.ajaxUrl || window.ajaxurl || '/wp-admin/admin-ajax.php';
+        var nonce = cfg.nonce || '';
         if (!nonce) {
             var nonceEl = document.getElementById('mb_qcm_nonce');
             if (nonceEl) nonce = nonceEl.value;
         }
-
-        var url = (window.mbAdmin && mbAdmin.ajaxUrl) ? mbAdmin.ajaxUrl : (window.ajaxurl || '/wp-admin/admin-ajax.php');
 
         $.ajax({
             url:      url,
@@ -161,11 +224,11 @@
                 action:    'mb_save_questions',
                 nonce:     nonce,
                 post_id:   postId,
-                questions: json
+                questions: json,
             },
             success: function (r) {
                 if (r && r.success) {
-                    markSaved();
+                    markSaved(r.data ? r.data.message : null);
                     updateCount();
                 } else {
                     var msg = (r && r.data && r.data.message) ? r.data.message : 'Échec serveur.';
@@ -174,11 +237,11 @@
             },
             error: function (xhr) {
                 var detail = xhr.responseText ? xhr.responseText.substring(0, 120) : 'sans réponse';
-                markError('Erreur réseau (' + xhr.status + '): ' + detail);
+                markError('Erreur réseau (' + xhr.status + ') : ' + detail);
             },
             complete: function () {
                 setSaveBtns(false, '💾 Sauvegarder les questions');
-            }
+            },
         });
     }
 
@@ -186,19 +249,22 @@
     function gatherQuestions() {
         var questions = [];
         qList.querySelectorAll('.mb-q-block').forEach(function (block) {
+            var textEl   = block.querySelector('.mb-q-text');
             var layoutR  = block.querySelector('.mb-layout:checked');
             var correctR = block.querySelector('.mb-correct-r:checked');
+            var corrEl   = block.querySelector('.mb-q-corr');
+            if (!textEl) return; // guard against malformed DOM
             questions.push({
-                text:    block.querySelector('.mb-q-text').value,
+                text:    textEl.value,
                 layout:  layoutR  ? layoutR.value  : 'grid',
                 ans: {
-                    a: block.querySelector('.mb-ans-a').value,
-                    b: block.querySelector('.mb-ans-b').value,
-                    c: block.querySelector('.mb-ans-c').value,
-                    d: block.querySelector('.mb-ans-d').value,
+                    a: (block.querySelector('.mb-ans-a') || {}).value || '',
+                    b: (block.querySelector('.mb-ans-b') || {}).value || '',
+                    c: (block.querySelector('.mb-ans-c') || {}).value || '',
+                    d: (block.querySelector('.mb-ans-d') || {}).value || '',
                 },
                 correct: correctR ? correctR.value : 'a',
-                corr:    block.querySelector('.mb-q-corr').value,
+                corr:    corrEl ? corrEl.value : '',
             });
         });
         return questions;
@@ -325,7 +391,6 @@
 
         if (!panel) return;
 
-        // Toggle open/closed
         if (toggleBtn) {
             toggleBtn.addEventListener('click', function () {
                 var collapsed = panel.style.display === 'none';
@@ -388,8 +453,7 @@
                 var n = questions.length;
                 var nLabel = n + ' question' + (n > 1 ? 's' : '') + ' importée' + (n > 1 ? 's' : '');
 
-                // Auto-save immediately if post already exists
-                var pidEl  = document.getElementById('post_ID');
+                var pidEl  = document.getElementById('mb_qcm_id') || document.getElementById('post_ID');
                 var postId = pidEl ? (parseInt(pidEl.value, 10) || 0) : 0;
                 if (postId) {
                     setImportStatus('info', nLabel + ' — sauvegarde en cours…');
@@ -412,58 +476,43 @@
     }
 
     // ── Parse the pasted JS/JSON array ────────────────────────────────────────
-    // Accepts the exact format used in the standalone HTML files:
-    //   [{num:1, text:"...", layout:"grid", ans:{a:"...",b:"...",c:"...",d:"..."},
-    //     correct:"c", corr:`<div>...</div>`}, ...]
-    // with or without leading `const Q =`.
     function parseImportCode(raw) {
         var cleaned = raw.trim()
-            .replace(/^\s*(const|let|var)\s+\w+\s*=\s*/, '') // strip `const Q =`
-            .replace(/;\s*$/, '');                             // strip trailing ;
+            .replace(/^\s*(const|let|var)\s+\w+\s*=\s*/, '')
+            .replace(/;\s*$/, '');
 
-        // ── Method 1: new Function (works everywhere unless CSP blocks eval) ──
+        // Method 1: new Function
         try {
             /* eslint-disable no-new-func */
             var r1 = (new Function('return (' + cleaned + ')'))();
             /* eslint-enable no-new-func */
             if (Array.isArray(r1) && r1.length) return r1;
-        } catch (_) { /* fall through — CSP may block eval */ }
+        } catch (_) {}
 
-        // ── Method 2: pure-regex converter (no eval, handles template literals) ─
-        // Step A: replace backtick template literals with proper JSON strings.
-        // The content between backticks uses JS escape rules (e.g. \\ → \);
-        // we mirror those rules then let JSON.stringify handle final encoding.
+        // Method 2: pure-regex converter (no eval)
         try {
             var json = cleaned.replace(/`([\s\S]*?)`/g, function (_, tmpl) {
-                // Process JS escape sequences inside the template literal
                 var s = tmpl.replace(/\\([\s\S])/g, function (m, c) {
                     if (c === 'n')  return '\n';
                     if (c === 'r')  return '\r';
                     if (c === 't')  return '\t';
                     if (c === '\\') return '\\';
                     if (c === '`')  return '`';
-                    return c; // keep any other escaped char as-is
+                    return c;
                 });
-                return JSON.stringify(s); // produces properly-quoted JSON string
+                return JSON.stringify(s);
             });
-
-            // Step B: add double-quotes around bare object keys (num: → "num":)
             json = json.replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/g, '$1"$2":');
-
             var r2 = JSON.parse(json);
             if (Array.isArray(r2) && r2.length) return r2;
-        } catch (_) { /* fall through */ }
+        } catch (_) {}
 
         return null;
     }
 
-    // Normalize an imported question object to our canonical format.
-    // Handles both new format (ans:{a,b,c,d}, correct:"c") and
-    // old format (choices:[], correct: 0-3, explanation).
     function normalizeImported(q) {
         if (!q || typeof q !== 'object') return {};
 
-        // New format already: has ans object and string correct
         if (q.ans && typeof q.ans === 'object' && typeof q.correct === 'string') {
             return {
                 text:    q.text    || '',
@@ -474,7 +523,6 @@
             };
         }
 
-        // Old format: choices[] array, correct is index (0-3)
         var letters = ['a', 'b', 'c', 'd'];
         var choices  = Array.isArray(q.choices) ? q.choices : [];
         var correctL = letters[parseInt(q.correct, 10)] || 'a';

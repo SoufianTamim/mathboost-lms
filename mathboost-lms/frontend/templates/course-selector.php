@@ -1,7 +1,7 @@
 <?php defined( 'ABSPATH' ) || exit; ?>
 
 <?php
-$level_slug  = ! empty( $atts['level'] )
+$level_slug = ! empty( $atts['level'] )
     ? sanitize_text_field( $atts['level'] )
     : ( isset( $_GET['mb_level'] ) ? sanitize_text_field( wp_unslash( $_GET['mb_level'] ) ) : '' );
 
@@ -9,104 +9,50 @@ $filter_cat  = ! empty( $atts['category'] )
     ? sanitize_text_field( $atts['category'] )
     : ( isset( $_GET['mb_cat'] ) ? sanitize_text_field( wp_unslash( $_GET['mb_cat'] ) ) : '' );
 
-$level_term      = $level_slug ? get_term_by( 'slug', $level_slug, 'mb_level' ) : null;
 $course_page_url = apply_filters( 'mb_course_page_url', get_permalink() );
 $upgrade_url     = apply_filters( 'mb_upgrade_url', '#upgrade' );
 $is_logged_in    = is_user_logged_in();
 $is_premium      = MB_Access::current_user_is_premium();
+
+if ( ! MB_Migrator::is_done() ) {
+    echo '<div class="mb-empty">' . esc_html__( 'Migration requise — veuillez migrer les données depuis l\'administration.', MB_TEXT_DOMAIN ) . '</div>';
+    return;
+}
+
+$level_term = $level_slug ? MB_Level_Repository::get_by_slug( $level_slug ) : null;
 
 if ( ! $level_term ) {
     echo '<div class="mb-empty">' . esc_html__( 'Niveau introuvable.', MB_TEXT_DOMAIN ) . '</div>';
     return;
 }
 
-// ── Fetch all published QCMs for this level ─────────────────────────────
-$qcm_args = [
-    'post_type'      => 'mb_qcm',
-    'posts_per_page' => -1,
-    'post_status'    => 'publish',
-    'orderby'        => 'menu_order title',
-    'order'          => 'ASC',
-    'tax_query'      => [ [
-        'taxonomy' => 'mb_level',
-        'field'    => 'term_id',
-        'terms'    => $level_term->term_id,
-    ] ],
-];
+// Resolve optional category filter
+$filter_term = $filter_cat ? MB_Category_Repository::get_by_slug( $filter_cat ) : null;
 
-// If a category filter is active, add it
-if ( $filter_cat ) {
-    $filter_term = get_term_by( 'slug', $filter_cat, 'mb_category' );
-    if ( $filter_term ) {
-        $qcm_args['tax_query'][] = [
-            'taxonomy' => 'mb_category',
-            'field'    => 'term_id',
-            'terms'    => $filter_term->term_id,
-            'include_children' => true,
-        ];
-    }
+// Fetch QCMs grouped by category for this level
+$cat_groups = MB_QCM_Repository::get_by_level_grouped_by_category( (int) $level_term->id );
+
+// Count total QCMs
+$total_qcms = 0;
+foreach ( $cat_groups as $group ) {
+    $total_qcms += count( $group['qcms'] );
 }
 
-$all_qcms = get_posts( $qcm_args );
-
-// ── Group QCMs by their mb_category ────────────────────────────────────
-$cat_groups = []; // [ cat_id => [ 'term' => WP_Term|null, 'qcms' => [...] ] ]
-
-foreach ( $all_qcms as $qcm_post ) {
-    $cats = wp_get_post_terms( $qcm_post->ID, 'mb_category', [
-        'orderby' => 'parent',
-        'order'   => 'ASC',
-    ] );
-
-    if ( empty( $cats ) || is_wp_error( $cats ) ) {
-        $cat_id = 0;
-        if ( ! isset( $cat_groups[0] ) ) {
-            $cat_groups[0] = [ 'term' => null, 'qcms' => [] ];
-        }
-    } else {
-        // Use the deepest (most specific) category
-        $cat    = end( $cats );
-        $cat_id = (int) $cat->term_id;
-        if ( ! isset( $cat_groups[ $cat_id ] ) ) {
-            $cat_groups[ $cat_id ] = [ 'term' => $cat, 'qcms' => [] ];
-        }
-    }
-
-    // Check access
-    $is_locked = false;
-    if ( ! $is_premium && ! current_user_can( 'manage_options' ) ) {
-        $is_locked = MB_Access::is_qcm_locked( $qcm_post->ID );
-    }
-
-    $q_json   = get_post_meta( $qcm_post->ID, '_mb_questions', true );
-    $q_count  = count( json_decode( $q_json ?: '[]', true ) );
-    $subtitle = get_post_meta( $qcm_post->ID, '_mb_subtitle', true );
-
-    $cat_groups[ $cat_id ]['qcms'][] = [
-        'post'      => $qcm_post,
-        'is_locked' => $is_locked,
-        'q_count'   => $q_count,
-        'subtitle'  => $subtitle,
-    ];
+// Apply category filter if set
+if ( $filter_term && isset( $cat_groups[ (int) $filter_term->id ] ) ) {
+    $cat_groups = [ (int) $filter_term->id => $cat_groups[ (int) $filter_term->id ] ];
 }
-
-// Sort: named categories alphabetically, "uncategorised" last
-uksort( $cat_groups, function ( $a, $b ) use ( $cat_groups ) {
-    if ( $a === 0 ) return 1;
-    if ( $b === 0 ) return -1;
-    return strcmp( $cat_groups[ $a ]['term']->name, $cat_groups[ $b ]['term']->name );
-} );
 ?>
 
 <div class="mb-course-wrap">
 
   <!-- ── Breadcrumb ──────────────────────────────────────────────────── -->
   <div class="mb-breadcrumb">
-    <a href="<?php echo esc_url( remove_query_arg( [ 'mb_level', 'mb_cat', 'mb_qcm' ] ) ); ?>">
+    <a href="<?php echo esc_url( remove_query_arg( [ 'mb_level', 'mb_cat', 'mb_qid' ] ) ); ?>">
       ← <?php esc_html_e( 'Niveaux', MB_TEXT_DOMAIN ); ?>
     </a>
     <span><?php echo esc_html( $level_term->name ); ?></span>
-    <?php if ( $filter_cat && isset( $filter_term ) && $filter_term ) : ?>
+    <?php if ( $filter_term ) : ?>
       <a href="<?php echo esc_url( remove_query_arg( 'mb_cat' ) ); ?>">
         <?php echo esc_html( $level_term->name ); ?>
       </a>
@@ -119,14 +65,10 @@ uksort( $cat_groups, function ( $a, $b ) use ( $cat_groups ) {
     <div class="mb-course-header-inner">
       <h2 class="mb-course-title"><?php echo esc_html( $level_term->name ); ?></h2>
       <p class="mb-course-sub">
-        <?php
-        $total_qcms = count( $all_qcms );
-        printf(
-            /* translators: %d number of QCMs */
+        <?php printf(
             esc_html( _n( '%d QCM disponible', '%d QCMs disponibles', $total_qcms, MB_TEXT_DOMAIN ) ),
             $total_qcms
-        );
-        ?>
+        ); ?>
       </p>
     </div>
     <?php if ( $is_premium ) : ?>
@@ -134,7 +76,7 @@ uksort( $cat_groups, function ( $a, $b ) use ( $cat_groups ) {
     <?php endif; ?>
   </div>
 
-  <?php if ( empty( $all_qcms ) ) : ?>
+  <?php if ( empty( $cat_groups ) ) : ?>
     <div class="mb-empty">
       <?php esc_html_e( 'Aucun QCM disponible pour ce niveau.', MB_TEXT_DOMAIN ); ?>
     </div>
@@ -142,43 +84,42 @@ uksort( $cat_groups, function ( $a, $b ) use ( $cat_groups ) {
 
     <!-- ── QCMs grouped by category ─────────────────────────────────── -->
     <?php foreach ( $cat_groups as $cat_id => $group ) :
-      $items      = $group['qcms'];
-      $free_count = 0;
-      foreach ( $items as $it ) { if ( ! $it['is_locked'] ) $free_count++; }
+      $items = $group['qcms'];
     ?>
       <div class="mb-qcm-section">
 
-        <?php if ( $group['term'] ) : ?>
+        <?php if ( $group['category'] ) : ?>
           <div class="mb-section-heading">
-            <span class="mb-section-heading-name"><?php echo esc_html( $group['term']->name ); ?></span>
+            <span class="mb-section-heading-name"><?php echo esc_html( $group['category']->name ); ?></span>
             <span class="mb-section-count"><?php echo count( $items ); ?> QCM<?php echo count( $items ) > 1 ? 's' : ''; ?></span>
           </div>
         <?php endif; ?>
 
         <div class="mb-qcm-items">
-          <?php foreach ( $items as $idx => $item ) :
-            $post      = $item['post'];
-            $is_locked = $item['is_locked'];
+          <?php foreach ( $items as $idx => $qcm ) :
+            $is_locked = false;
+            if ( ! $is_premium && ! current_user_can( 'manage_options' ) ) {
+                $is_locked = (bool) $qcm->is_locked;
+            }
             $start_url = esc_url( add_query_arg( [
                 'mb_level' => $level_slug,
-                'mb_qid'   => $post->ID,
+                'mb_qid'   => $qcm->id,
             ], $course_page_url ) );
+            $q_count = count( json_decode( $qcm->questions ?: '[]', true ) ?? [] );
           ?>
 
             <div class="mb-qcm-item <?php echo $is_locked ? 'is-locked' : ''; ?>">
 
               <div class="mb-qcm-item-left">
-                <span class="mb-qcm-num">
-                  <?php echo $is_locked ? '🔒' : ( $idx + 1 ); ?>
-                </span>
+                <span class="mb-qcm-num"><?php echo $is_locked ? '🔒' : ( $idx + 1 ); ?></span>
                 <div class="mb-qcm-item-info">
-                  <span class="mb-qcm-item-title"><?php echo esc_html( $post->post_title ); ?></span>
-                  <?php if ( $item['subtitle'] ) : ?>
-                    <span class="mb-qcm-item-sub"><?php echo esc_html( $item['subtitle'] ); ?></span>
+                  <span class="mb-qcm-item-title"><?php echo esc_html( $qcm->title ); ?></span>
+                  <?php if ( $qcm->subtitle ) : ?>
+                    <span class="mb-qcm-item-sub"><?php echo esc_html( $qcm->subtitle ); ?></span>
                   <?php endif; ?>
-                  <?php if ( $item['q_count'] ) : ?>
+                  <?php if ( $q_count ) : ?>
                     <span class="mb-qcm-item-meta">
-                      📝 <?php echo (int) $item['q_count']; ?> <?php esc_html_e( 'questions', MB_TEXT_DOMAIN ); ?>
+                      📝 <?php echo $q_count; ?> <?php esc_html_e( 'questions', MB_TEXT_DOMAIN ); ?>
                     </span>
                   <?php endif; ?>
                 </div>

@@ -1,11 +1,17 @@
 <?php defined( 'ABSPATH' ) || exit; ?>
 
 <?php
-$qcm       = get_post( $qcm_id );
-$title     = get_the_title( $qcm_id );
-$intro     = get_post_meta( $qcm_id, '_mb_intro', true );
-$questions_raw = get_post_meta( $qcm_id, '_mb_questions', true );
-$questions = json_decode( $questions_raw ?: '[]', true );
+$qcm = MB_QCM_Repository::get_by_id( (int) $qcm_id );
+
+if ( ! $qcm ) {
+    echo '<div class="mb-empty">' . esc_html__( 'QCM introuvable.', MB_TEXT_DOMAIN ) . '</div>';
+    return;
+}
+
+$title     = $qcm->title;
+$subtitle  = $qcm->subtitle;
+$intro     = $qcm->intro;
+$questions = json_decode( $qcm->questions ?: '[]', true ) ?? [];
 $total     = count( $questions );
 
 if ( ! $total ) {
@@ -14,19 +20,27 @@ if ( ! $total ) {
 }
 
 $js_questions = wp_json_encode( $questions, JSON_HEX_TAG | JSON_HEX_AMP );
-$cats = wp_get_post_terms( $qcm_id, 'mb_category', [ 'fields' => 'names' ] );
-$subtitle = get_post_meta( $qcm_id, '_mb_subtitle', true );
+
+// Resolve category names for the subtitle line
+$cat_ids   = MB_QCM_Repository::get_category_ids( (int) $qcm->id );
+$cat_names = [];
+foreach ( $cat_ids as $cid ) {
+    $cat = MB_Category_Repository::get_by_id( $cid );
+    if ( $cat ) {
+        $cat_names[] = $cat->name;
+    }
+}
 ?>
 
-<div class="qcm-wrap" id="mb-qcm-<?php echo esc_attr( $qcm_id ); ?>">
+<div class="qcm-wrap" id="mb-qcm-<?php echo esc_attr( $qcm->id ); ?>">
 
   <!-- HEADER -->
   <div class="qcm-header">
     <h1><?php echo esc_html( $title ); ?></h1>
     <?php if ( $subtitle ) : ?>
       <p><?php echo esc_html( $subtitle ); ?></p>
-    <?php elseif ( ! empty( $cats ) && ! is_wp_error( $cats ) ) : ?>
-      <p><?php echo esc_html( implode( ' › ', $cats ) ); ?></p>
+    <?php elseif ( ! empty( $cat_names ) ) : ?>
+      <p><?php echo esc_html( implode( ' › ', $cat_names ) ); ?></p>
     <?php endif; ?>
   </div>
 
@@ -112,9 +126,9 @@ $subtitle = get_post_meta( $qcm_id, '_mb_subtitle', true );
 <script>
 (function () {
   window.MB_QCM_DATA = {
-    qcmId    : <?php echo (int) $qcm_id; ?>,
+    qcmId    : <?php echo (int) $qcm->id; ?>,
     total    : <?php echo (int) $total; ?>,
-    questions: <?php echo $js_questions; /* already encoded with JSON_HEX_TAG */ ?>,
+    questions: <?php echo $js_questions; ?>,
     nonce    : '<?php echo esc_js( wp_create_nonce( 'mb_report_nonce' ) ); ?>',
     ajaxUrl  : '<?php echo esc_js( admin_url( 'admin-ajax.php' ) ); ?>'
   };

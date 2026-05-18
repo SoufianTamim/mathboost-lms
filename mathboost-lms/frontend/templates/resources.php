@@ -12,10 +12,9 @@ if ( $mb_qcm_param ) {
     $qcm_id   = $mb_qcm_param;
     $back_url = esc_url( remove_query_arg( 'mb_qid' ) );
 
-    // Resolve breadcrumb label
     $back_label = '← ' . esc_html__( 'Retour', MB_TEXT_DOMAIN );
     if ( $mb_level_param ) {
-        $level_t = get_term_by( 'slug', $mb_level_param, 'mb_level' );
+        $level_t = MB_Level_Repository::get_by_slug( $mb_level_param );
         if ( $level_t ) {
             $back_label = '← ' . esc_html( $level_t->name );
         }
@@ -38,14 +37,13 @@ if ( $mb_level_param ) {
     return;
 }
 
-// ── Route 3 : Home — level grid ──────────────────────────────────────────
-$levels = get_terms( [
-    'taxonomy'   => 'mb_level',
-    'hide_empty' => false,
-    'parent'     => 0,
-    'orderby'    => 'name',
-    'order'      => 'ASC',
-] );
+// ── Route 3 : Home — level grid (requires migration) ─────────────────────
+if ( ! MB_Migrator::is_done() ) {
+    echo '<div class="mb-empty">' . esc_html__( 'Configuration en cours — veuillez effectuer la migration depuis l\'administration.', MB_TEXT_DOMAIN ) . '</div>';
+    return;
+}
+
+$top_levels = MB_Level_Repository::get_top_level();
 ?>
 
 <div class="mb-resources-wrap">
@@ -59,19 +57,15 @@ $levels = get_terms( [
     </p>
   </div>
 
-  <?php if ( ! empty( $levels ) && ! is_wp_error( $levels ) ) : ?>
+  <?php if ( ! empty( $top_levels ) ) : ?>
 
-    <?php foreach ( $levels as $level ) :
-      $children = get_terms( [
-          'taxonomy'   => 'mb_level',
-          'hide_empty' => false,
-          'parent'     => $level->term_id,
-      ] );
+    <?php foreach ( $top_levels as $level ) :
+      $children = MB_Level_Repository::get_children( (int) $level->id );
     ?>
-      <div class="mb-level-section" data-color="<?php echo esc_attr( get_term_meta( $level->term_id, 'mb_color', true ) ?: 'teal' ); ?>">
+      <div class="mb-level-section" data-color="<?php echo esc_attr( $level->color ?: 'teal' ); ?>">
         <div class="mb-section-title"><?php echo esc_html( $level->name ); ?></div>
         <div class="mb-level-grid">
-          <?php if ( ! empty( $children ) && ! is_wp_error( $children ) ) : ?>
+          <?php if ( ! empty( $children ) ) : ?>
             <?php foreach ( $children as $child ) : ?>
               <a class="mb-level-card" href="<?php echo esc_url( add_query_arg( 'mb_level', $child->slug, $course_page_url ) ); ?>">
                 <?php echo esc_html( $child->name ); ?>
@@ -87,29 +81,9 @@ $levels = get_terms( [
     <?php endforeach; ?>
 
   <?php else : ?>
-
-    <?php
-    $static_sections = [
-        [ 'label' => __( 'Primaire', MB_TEXT_DOMAIN ),    'color' => 'teal',  'items' => [ 'CP', 'CE1', 'CE2', 'CM1', 'CM2' ] ],
-        [ 'label' => __( 'Collège', MB_TEXT_DOMAIN ),     'color' => 'teal',  'items' => [ 'Cinquième', 'Quatrième', 'Troisième' ] ],
-        [ 'label' => __( 'Lycée', MB_TEXT_DOMAIN ),       'color' => 'teal',  'items' => [ 'Seconde', 'Première', 'Terminale' ] ],
-        [ 'label' => __( 'Prépa', MB_TEXT_DOMAIN ),       'color' => 'teal',  'items' => [ 'PTSI', 'PCSI', 'MPSI' ] ],
-        [ 'label' => __( 'Concours', MB_TEXT_DOMAIN ),    'color' => 'coral', 'items' => [ 'CAPES', 'CRPE', 'AGREG' ] ],
-    ];
-    ?>
-    <?php foreach ( $static_sections as $sec ) : ?>
-      <div class="mb-level-section" data-color="<?php echo esc_attr( $sec['color'] ); ?>">
-        <div class="mb-section-title"><?php echo esc_html( $sec['label'] ); ?></div>
-        <div class="mb-level-grid">
-          <?php foreach ( $sec['items'] as $item ) : ?>
-            <a class="mb-level-card" href="<?php echo esc_url( add_query_arg( 'mb_level', sanitize_title( $item ), $course_page_url ) ); ?>">
-              <?php echo esc_html( $item ); ?>
-            </a>
-          <?php endforeach; ?>
-        </div>
-      </div>
-    <?php endforeach; ?>
-
+    <div class="mb-empty">
+      <?php esc_html_e( 'Aucun niveau disponible.', MB_TEXT_DOMAIN ); ?>
+    </div>
   <?php endif; ?>
 
 </div>

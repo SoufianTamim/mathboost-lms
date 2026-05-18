@@ -5,9 +5,13 @@ class MB_Frontend {
 
     public static function init() {
         add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue' ] );
-        add_filter( 'the_content',        [ __CLASS__, 'maybe_inject_qcm' ] );
-        add_action( 'template_include',   [ __CLASS__, 'maybe_use_qcm_template' ] );
         add_filter( 'mb_upgrade_url',     [ __CLASS__, 'get_upgrade_url' ] );
+
+        // CPT-specific hooks are only relevant before migration
+        if ( ! MB_Migrator::is_done() ) {
+            add_filter( 'the_content',      [ __CLASS__, 'maybe_inject_qcm' ] );
+            add_action( 'template_include', [ __CLASS__, 'maybe_use_qcm_template' ] );
+        }
     }
 
     public static function get_upgrade_url( string $url ): string {
@@ -30,32 +34,11 @@ class MB_Frontend {
             null
         );
 
-        wp_enqueue_script(
-            'mb-nav',
-            MB_PLUGIN_URL . 'assets/js/mb-nav.js',
-            [],
-            MB_VERSION,
-            true
-        );
+        wp_enqueue_script( 'mb-nav', MB_PLUGIN_URL . 'assets/js/mb-nav.js', [], MB_VERSION, true );
+        wp_enqueue_script( 'mb-qcm', MB_PLUGIN_URL . 'assets/js/mb-qcm.js', [], MB_VERSION, true );
 
-        wp_enqueue_script(
-            'mb-qcm',
-            MB_PLUGIN_URL . 'assets/js/mb-qcm.js',
-            [],
-            MB_VERSION,
-            true
-        );
-
-        // MathJax must load in <head> — register it first, then prepend the config
-        wp_enqueue_script(
-            'mathjax',
-            'https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js',
-            [],
-            null,
-            false // in <head>
-        );
-
-        // Config must be output BEFORE the mathjax script tag
+        // MathJax in <head>
+        wp_enqueue_script( 'mathjax', 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js', [], null, false );
         wp_add_inline_script( 'mathjax',
             'window.MathJax = {
                 tex: { inlineMath: [["\\\\(","\\\\)"]], displayMath: [["\\\\[","\\\\]"]] },
@@ -68,14 +51,14 @@ class MB_Frontend {
         $client = get_option( 'mb_paypal_client_id', '' );
 
         wp_localize_script( 'mb-qcm', 'mbConfig', [
-            'ajaxUrl'      => admin_url( 'admin-ajax.php' ),
-            'nonce'        => wp_create_nonce( 'mb_report_nonce' ),
-            'activateNonce'=> wp_create_nonce( 'mb_activate_nonce' ),
-            'paypalNonce'  => wp_create_nonce( 'mb_paypal_nonce' ),
-            'paypalClient' => esc_js( $client ),
-            'price'        => esc_js( $price ),
-            'currency'     => esc_js( get_option( 'mb_currency', 'EUR' ) ),
-            'i18n'         => [
+            'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
+            'nonce'         => wp_create_nonce( 'mb_report_nonce' ),
+            'activateNonce' => wp_create_nonce( 'mb_activate_nonce' ),
+            'paypalNonce'   => wp_create_nonce( 'mb_paypal_nonce' ),
+            'paypalClient'  => esc_js( $client ),
+            'price'         => esc_js( $price ),
+            'currency'      => esc_js( get_option( 'mb_currency', 'EUR' ) ),
+            'i18n'          => [
                 'score'           => __( 'Score', MB_TEXT_DOMAIN ),
                 'correction'      => __( 'Voir la correction', MB_TEXT_DOMAIN ),
                 'hide'            => __( 'Masquer la correction', MB_TEXT_DOMAIN ),
@@ -85,7 +68,6 @@ class MB_Frontend {
             ],
         ] );
 
-        // PayPal SDK if client configured
         if ( $client ) {
             wp_enqueue_script(
                 'paypal-sdk',
@@ -97,7 +79,7 @@ class MB_Frontend {
         }
     }
 
-    // Auto-inject QCM shortcode on single mb_qcm posts
+    // Pre-migration: auto-inject QCM on singular mb_qcm posts
     public static function maybe_inject_qcm( string $content ): string {
         if ( ! is_singular( 'mb_qcm' ) || ! in_the_loop() || ! is_main_query() ) {
             return $content;
