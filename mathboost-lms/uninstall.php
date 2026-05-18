@@ -35,6 +35,7 @@ $options = [
     'mb_email_contact',
     'mb_payment_page_url',
     'mb_login_page_url',
+    'mb_register_page_url',
     'mb_db_version',
 ];
 

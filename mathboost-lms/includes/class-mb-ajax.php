@@ -309,43 +309,55 @@ class MB_Ajax {
             wp_die( esc_html__( 'Erreur de sécurité — rechargez la page.', MB_TEXT_DOMAIN ) );
         }
 
-        $login_page  = get_option( 'mb_login_page_url', '' ) ?: wp_login_url();
-        $reg_page    = add_query_arg( 'tab', 'register', $login_page );
-        $redirect_to = isset( $_POST['redirect_to'] ) ? esc_url_raw( wp_unslash( $_POST['redirect_to'] ) ) : '';
+        $login_page    = get_option( 'mb_login_page_url',    '' ) ?: wp_login_url();
+        $register_page = get_option( 'mb_register_page_url', '' ) ?: $login_page;
+        $redirect_to   = isset( $_POST['redirect_to'] ) ? esc_url_raw( wp_unslash( $_POST['redirect_to'] ) ) : '';
 
         if ( ! get_option( 'users_can_register' ) ) {
-            wp_safe_redirect( add_query_arg( 'mb_login_error', rawurlencode( 'Les inscriptions sont fermées.' ), $reg_page ) );
+            wp_safe_redirect( add_query_arg( 'mb_login_error', rawurlencode( 'Les inscriptions sont fermées.' ), $register_page ) );
             exit;
         }
 
-        $user_login = isset( $_POST['user_login'] ) ? sanitize_user( wp_unslash( $_POST['user_login'] ) ) : '';
-        $user_email = isset( $_POST['user_email'] ) ? sanitize_email( wp_unslash( $_POST['user_email'] ) ) : '';
-        $user_pass  = isset( $_POST['user_pass'] )  ? wp_unslash( $_POST['user_pass'] ) : '';
+        $user_login      = isset( $_POST['user_login'] )      ? sanitize_user( wp_unslash( $_POST['user_login'] ) )          : '';
+        $user_email      = isset( $_POST['user_email'] )      ? sanitize_email( wp_unslash( $_POST['user_email'] ) )         : '';
+        $user_pass       = isset( $_POST['user_pass'] )       ? wp_unslash( $_POST['user_pass'] )                            : '';
+        $activation_code = isset( $_POST['activation_code'] ) ? sanitize_text_field( wp_unslash( $_POST['activation_code'] ) ) : '';
 
         if ( ! $user_login || ! $user_email || ! $user_pass ) {
-            wp_safe_redirect( add_query_arg( 'mb_login_error', rawurlencode( 'Tous les champs sont requis.' ), $reg_page ) );
+            wp_safe_redirect( add_query_arg( 'mb_login_error', rawurlencode( 'Tous les champs sont requis.' ), $register_page ) );
             exit;
         }
 
         if ( strlen( $user_pass ) < 8 ) {
-            wp_safe_redirect( add_query_arg( 'mb_login_error', rawurlencode( 'Le mot de passe doit contenir au moins 8 caractères.' ), $reg_page ) );
+            wp_safe_redirect( add_query_arg( 'mb_login_error', rawurlencode( 'Le mot de passe doit contenir au moins 8 caractères.' ), $register_page ) );
             exit;
         }
 
         $user_id = wp_create_user( $user_login, $user_pass, $user_email );
 
         if ( is_wp_error( $user_id ) ) {
-            wp_safe_redirect( add_query_arg( 'mb_login_error', rawurlencode( $user_id->get_error_message() ), $reg_page ) );
+            wp_safe_redirect( add_query_arg( 'mb_login_error', rawurlencode( $user_id->get_error_message() ), $register_page ) );
             exit;
         }
 
+        // Auto-login
         wp_set_auth_cookie( $user_id, false, is_ssl() );
+
+        // Try activation code if provided
+        $code_msg = '';
+        if ( $activation_code ) {
+            $result = MB_Activation_Codes::activate( $activation_code, $user_id );
+            $code_msg = $result['success']
+                ? ' Votre code premium a été activé !'
+                : ' (Code invalide — non appliqué.)';
+        }
 
         if ( $redirect_to ) {
             $safe = wp_validate_redirect( $redirect_to, $login_page );
             wp_safe_redirect( $safe );
         } else {
-            wp_safe_redirect( add_query_arg( 'mb_login_success', rawurlencode( 'Compte créé avec succès ! Bienvenue !' ), $login_page ) );
+            $success = rawurlencode( 'Compte créé avec succès ! Bienvenue !' . $code_msg );
+            wp_safe_redirect( add_query_arg( 'mb_login_success', $success, $login_page ) );
         }
         exit;
     }

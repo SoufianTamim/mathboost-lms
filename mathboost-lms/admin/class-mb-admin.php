@@ -1177,7 +1177,7 @@ jQuery(function($){
         foreach ( [
             'mb_paypal_client_id', 'mb_paypal_secret', 'mb_price', 'mb_currency',
             'mb_max_sessions', 'mb_free_locked_count', 'mb_premium_duration',
-            'mb_email_contact', 'mb_payment_page_url', 'mb_login_page_url',
+            'mb_email_contact', 'mb_payment_page_url', 'mb_login_page_url', 'mb_register_page_url',
         ] as $opt ) {
             register_setting( 'mb_settings_group', $opt );
         }
@@ -1216,7 +1216,11 @@ jQuery(function($){
               <tr><th><?php esc_html_e( 'URL page connexion', MB_TEXT_DOMAIN ); ?></th>
                 <td><input type="url" name="mb_login_page_url" value="<?php echo esc_attr( get_option( 'mb_login_page_url' ) ); ?>" class="regular-text"
                            placeholder="https://mathboost.net/connexion/">
-                  <p class="description"><?php esc_html_e( 'URL de la page de connexion personnalisée. Créée automatiquement à l\'activation.', MB_TEXT_DOMAIN ); ?></p></td></tr>
+                  <p class="description"><?php esc_html_e( 'Page de connexion personnalisée. Créée automatiquement à l\'activation.', MB_TEXT_DOMAIN ); ?></p></td></tr>
+              <tr><th><?php esc_html_e( 'URL page inscription', MB_TEXT_DOMAIN ); ?></th>
+                <td><input type="url" name="mb_register_page_url" value="<?php echo esc_attr( get_option( 'mb_register_page_url' ) ); ?>" class="regular-text"
+                           placeholder="https://mathboost.net/inscription/">
+                  <p class="description"><?php esc_html_e( 'Page d\'inscription avec formulaire et code d\'activation. Créée automatiquement à l\'activation.', MB_TEXT_DOMAIN ); ?></p></td></tr>
             </table>
             <?php submit_button(); ?>
           </form>

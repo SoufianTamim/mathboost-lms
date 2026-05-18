@@ -148,18 +148,24 @@ class MB_Activator {
         add_option( 'mb_email_contact',     get_option( 'admin_email' ) );
         add_option( 'mb_premium_duration',  '365' ); // days, 0 = lifetime
         add_option( 'mb_login_page_url',    '' );
+        add_option( 'mb_register_page_url', '' );
         add_option( 'mb_payment_page_url',  '' );
     }
 
     // ── Auto-create login and payment pages if they don't exist ──────────────
     private static function create_pages(): void {
         $pages = [
-            'mb_login_page_url'   => [
+            'mb_login_page_url'    => [
                 'title'   => 'Connexion',
                 'content' => '[mathboost_login]',
                 'slug'    => 'connexion',
             ],
-            'mb_payment_page_url' => [
+            'mb_register_page_url' => [
+                'title'   => 'Inscription',
+                'content' => '[mathboost_register]',
+                'slug'    => 'inscription',
+            ],
+            'mb_payment_page_url'  => [
                 'title'   => 'Accès Premium',
                 'content' => '[mathboost_payment]',
                 'slug'    => 'premium',

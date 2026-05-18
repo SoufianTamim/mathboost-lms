@@ -490,10 +490,51 @@
 .mb-btn-block { width: 100%; justify-content: center; }
 
 .mb-form-links {
-  text-align: center; margin-top: 4px; font-size: 13px;
+  text-align: center; margin-top: 4px; font-size: 13px; color: var(--mb-text-light);
 }
 .mb-form-links a { color: var(--mb-primary); text-decoration: none; font-weight: 600; }
 .mb-form-links a:hover { text-decoration: underline; }
+
+/* password toggle */
+.mb-password-wrap { position: relative; display: flex; align-items: center; }
+.mb-password-wrap .mb-form-input { flex: 1; padding-right: 44px; }
+.mb-toggle-pass {
+  position: absolute; right: 10px;
+  background: none; border: none; cursor: pointer;
+  font-size: 18px; padding: 0; line-height: 1;
+  color: var(--mb-text-light);
+}
+
+/* Register link CTA below login */
+.mb-login-register-cta {
+  margin-top: 20px; padding-top: 20px;
+  border-top: 1px solid var(--mb-border);
+  text-align: center;
+}
+.mb-login-register-cta p {
+  margin: 0 0 10px; font-size: 14px; color: var(--mb-text-light);
+}
+
+/* Activation code collapsible */
+.mb-register-code-section { margin-top: 4px; }
+.mb-code-toggle {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; background: var(--mb-bg);
+  border: 1px dashed var(--mb-border); border-radius: 8px;
+  font-family: var(--mb-font); font-size: 13px; font-weight: 600;
+  color: var(--mb-primary); cursor: pointer; transition: all .2s;
+}
+.mb-code-toggle:hover { background: #f0efff; border-color: var(--mb-primary); }
+.mb-code-toggle-arrow { font-size: 11px; }
+.mb-code-collapse { display: none; }
+.mb-code-collapse.is-open { display: block; }
+
+/* Register closed state */
+.mb-register-closed {
+  text-align: center; padding: 24px 0;
+}
+.mb-register-closed-icon { font-size: 36px; margin-bottom: 12px; }
+.mb-register-closed p { color: var(--mb-text-light); margin-bottom: 16px; }
 
 /* ── Animations ───────────────────────────────── */
 @keyframes fadeInUp {

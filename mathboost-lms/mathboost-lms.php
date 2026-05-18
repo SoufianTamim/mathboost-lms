@@ -3,7 +3,7 @@
  * Plugin Name:       MathBoost LMS
  * Plugin URI:        https://mathboost.net
  * Description:       Système LMS complet pour QCMs de mathématiques avec freemium, codes d'activation, MathJax, navigation par niveaux/cours/catégories et restriction de sessions.
- * Version:           2.0.3
+ * Version:           2.0.4
  * Author:            MathBoost
  * Author URI:        https://mathboost.net
  * License:           GPL-2.0-or-later
@@ -17,7 +17,7 @@
 defined( 'ABSPATH' ) || exit;
 
 // ── Constants ────────────────────────────────────────────────────────────────
-define( 'MB_VERSION',     '2.0.3' );
+define( 'MB_VERSION',     '2.0.4' );
 define( 'MB_PLUGIN_FILE', __FILE__ );
 define( 'MB_PLUGIN_DIR',  plugin_dir_path( __FILE__ ) );
 define( 'MB_PLUGIN_URL',  plugin_dir_url( __FILE__ ) );
