@@ -39,8 +39,8 @@ if ( is_user_logged_in() ) {
 $redirect_to      = isset( $_GET['redirect_to'] ) ? esc_url_raw( wp_unslash( $_GET['redirect_to'] ) ) : '';
 $error_msg        = isset( $_GET['mb_login_error'] )   ? sanitize_text_field( urldecode( wp_unslash( $_GET['mb_login_error'] ) ) )   : '';
 $success_msg      = isset( $_GET['mb_login_success'] ) ? sanitize_text_field( urldecode( wp_unslash( $_GET['mb_login_success'] ) ) ) : '';
-$register_allowed = get_option( 'users_can_register' );
-$register_url     = get_option( 'mb_register_page_url', '' );
+$register_allowed = (bool) get_option( 'mb_allow_register', 1 );
+$register_url     = get_option( 'mb_register_page_url', '' ) ?: home_url( '/inscription/' );
 ?>
 
 <div class="mb-login-wrap">
@@ -99,7 +99,7 @@ $register_url     = get_option( 'mb_register_page_url', '' );
         </div>
       </form>
 
-      <?php if ( $register_allowed && $register_url ) : ?>
+      <?php if ( $register_allowed ) : ?>
         <div class="mb-login-register-cta">
           <p><?php esc_html_e( 'Pas encore inscrit ?', MB_TEXT_DOMAIN ); ?></p>
           <a class="mb-btn mb-btn-outline mb-btn-block"

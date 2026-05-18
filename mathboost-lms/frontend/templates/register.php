@@ -45,7 +45,7 @@ $login_url        = get_option( 'mb_login_page_url', '' ) ?: wp_login_url();
 $redirect_to      = isset( $_GET['redirect_to'] ) ? esc_url_raw( wp_unslash( $_GET['redirect_to'] ) ) : '';
 $error_msg        = isset( $_GET['mb_login_error'] )   ? sanitize_text_field( urldecode( wp_unslash( $_GET['mb_login_error'] ) ) )   : '';
 $success_msg      = isset( $_GET['mb_login_success'] ) ? sanitize_text_field( urldecode( wp_unslash( $_GET['mb_login_success'] ) ) ) : '';
-$register_allowed = get_option( 'users_can_register' );
+$register_allowed = (bool) get_option( 'mb_allow_register', 1 );
 ?>
 
 <div class="mb-login-wrap">

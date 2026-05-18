@@ -147,6 +147,7 @@ class MB_Activator {
         add_option( 'mb_free_locked_count', '3' );
         add_option( 'mb_email_contact',     get_option( 'admin_email' ) );
         add_option( 'mb_premium_duration',  '365' ); // days, 0 = lifetime
+        add_option( 'mb_allow_register',    '1' );
         add_option( 'mb_login_page_url',    '' );
         add_option( 'mb_register_page_url', '' );
         add_option( 'mb_payment_page_url',  '' );

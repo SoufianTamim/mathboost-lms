@@ -310,12 +310,18 @@ class MB_Ajax {
         }
 
         $login_page    = get_option( 'mb_login_page_url',    '' ) ?: wp_login_url();
-        $register_page = get_option( 'mb_register_page_url', '' ) ?: $login_page;
+        $register_page = get_option( 'mb_register_page_url', '' ) ?: home_url( '/inscription/' );
         $redirect_to   = isset( $_POST['redirect_to'] ) ? esc_url_raw( wp_unslash( $_POST['redirect_to'] ) ) : '';
 
-        if ( ! get_option( 'users_can_register' ) ) {
+        if ( ! get_option( 'mb_allow_register', 1 ) ) {
             wp_safe_redirect( add_query_arg( 'mb_login_error', rawurlencode( 'Les inscriptions sont fermées.' ), $register_page ) );
             exit;
+        }
+
+        // Temporarily enable WP registration so wp_create_user() doesn't fail
+        $wp_reg_was = get_option( 'users_can_register' );
+        if ( ! $wp_reg_was ) {
+            update_option( 'users_can_register', 1 );
         }
 
         $user_login      = isset( $_POST['user_login'] )      ? sanitize_user( wp_unslash( $_POST['user_login'] ) )          : '';
@@ -334,6 +340,11 @@ class MB_Ajax {
         }
 
         $user_id = wp_create_user( $user_login, $user_pass, $user_email );
+
+        // Restore WP registration setting if we changed it
+        if ( ! $wp_reg_was ) {
+            update_option( 'users_can_register', 0 );
+        }
 
         if ( is_wp_error( $user_id ) ) {
             wp_safe_redirect( add_query_arg( 'mb_login_error', rawurlencode( $user_id->get_error_message() ), $register_page ) );

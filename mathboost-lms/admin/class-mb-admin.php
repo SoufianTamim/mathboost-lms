@@ -1177,7 +1177,7 @@ jQuery(function($){
         foreach ( [
             'mb_paypal_client_id', 'mb_paypal_secret', 'mb_price', 'mb_currency',
             'mb_max_sessions', 'mb_free_locked_count', 'mb_premium_duration',
-            'mb_email_contact', 'mb_payment_page_url', 'mb_login_page_url', 'mb_register_page_url',
+            'mb_email_contact', 'mb_payment_page_url', 'mb_login_page_url', 'mb_register_page_url', 'mb_allow_register',
         ] as $opt ) {
             register_setting( 'mb_settings_group', $opt );
         }
@@ -1213,6 +1213,11 @@ jQuery(function($){
                 <td><input type="url" name="mb_payment_page_url" value="<?php echo esc_attr( get_option( 'mb_payment_page_url' ) ); ?>" class="regular-text"
                            placeholder="https://mathboost.net/premium/">
                   <p class="description"><?php esc_html_e( 'URL vers la page premium quand un QCM est verrouillé. Créée automatiquement à l\'activation.', MB_TEXT_DOMAIN ); ?></p></td></tr>
+              <tr><th><?php esc_html_e( 'Inscriptions ouvertes', MB_TEXT_DOMAIN ); ?></th>
+                <td><label><input type="checkbox" name="mb_allow_register" value="1" <?php checked( get_option( 'mb_allow_register', '1' ), '1' ); ?>>
+                  <?php esc_html_e( 'Autoriser la création de nouveaux comptes', MB_TEXT_DOMAIN ); ?>
+                </label>
+                <p class="description"><?php esc_html_e( 'Si décoché, le formulaire d\'inscription est désactivé.', MB_TEXT_DOMAIN ); ?></p></td></tr>
               <tr><th><?php esc_html_e( 'URL page connexion', MB_TEXT_DOMAIN ); ?></th>
                 <td><input type="url" name="mb_login_page_url" value="<?php echo esc_attr( get_option( 'mb_login_page_url' ) ); ?>" class="regular-text"
                            placeholder="https://mathboost.net/connexion/">
