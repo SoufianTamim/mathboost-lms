@@ -13,6 +13,12 @@ class MB_Ajax {
         add_action( 'wp_ajax_mb_admin_delete_code',    [ __CLASS__, 'handle_delete_code' ] );
         add_action( 'wp_ajax_mb_admin_revoke_premium', [ __CLASS__, 'handle_revoke_premium' ] );
         add_action( 'wp_ajax_mb_save_questions',       [ __CLASS__, 'handle_save_questions' ] );
+        add_action( 'wp_ajax_mb_save_progress',        [ __CLASS__, 'handle_save_progress' ] );
+        add_action( 'wp_ajax_nopriv_mb_save_progress', [ __CLASS__, 'handle_save_progress' ] );
+        add_action( 'admin_post_nopriv_mb_do_login',   [ __CLASS__, 'handle_do_login' ] );
+        add_action( 'admin_post_mb_do_login',          [ __CLASS__, 'handle_do_login' ] );
+        add_action( 'admin_post_nopriv_mb_do_register',[ __CLASS__, 'handle_do_register' ] );
+        add_action( 'admin_post_mb_do_register',       [ __CLASS__, 'handle_do_register' ] );
     }
 
     // ── Fetch questions ───────────────────────────────────────────────────────
@@ -255,6 +261,127 @@ class MB_Ajax {
         }
 
         wp_send_json_success();
+    }
+
+    // ── Custom login ──────────────────────────────────────────────────────────
+    public static function handle_do_login(): void {
+        $nonce = isset( $_POST['mb_login_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['mb_login_nonce'] ) ) : '';
+        if ( ! wp_verify_nonce( $nonce, 'mb_do_login' ) ) {
+            wp_die( esc_html__( 'Erreur de sécurité — rechargez la page.', MB_TEXT_DOMAIN ) );
+        }
+
+        $login_page  = get_option( 'mb_login_page_url', '' ) ?: wp_login_url();
+        $redirect_to = isset( $_POST['redirect_to'] ) ? esc_url_raw( wp_unslash( $_POST['redirect_to'] ) ) : '';
+
+        $credentials = [
+            'user_login'    => isset( $_POST['log'] ) ? sanitize_user( wp_unslash( $_POST['log'] ) ) : '',
+            'user_password' => isset( $_POST['pwd'] ) ? wp_unslash( $_POST['pwd'] ) : '',
+            'remember'      => isset( $_POST['rememberme'] ),
+        ];
+
+        if ( ! $credentials['user_login'] || ! $credentials['user_password'] ) {
+            wp_safe_redirect( add_query_arg( 'mb_login_error', rawurlencode( 'Identifiant et mot de passe requis.' ), $login_page ) );
+            exit;
+        }
+
+        $user = wp_signon( $credentials, is_ssl() );
+
+        if ( is_wp_error( $user ) ) {
+            wp_safe_redirect( add_query_arg( 'mb_login_error', rawurlencode( 'Identifiant ou mot de passe incorrect.' ), $login_page ) );
+            exit;
+        }
+
+        if ( $redirect_to ) {
+            $safe = wp_validate_redirect( $redirect_to, $login_page );
+            wp_safe_redirect( $safe );
+        } elseif ( $user->has_cap( 'manage_options' ) ) {
+            wp_safe_redirect( admin_url() );
+        } else {
+            wp_safe_redirect( $login_page );
+        }
+        exit;
+    }
+
+    // ── Custom register ───────────────────────────────────────────────────────
+    public static function handle_do_register(): void {
+        $nonce = isset( $_POST['mb_register_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['mb_register_nonce'] ) ) : '';
+        if ( ! wp_verify_nonce( $nonce, 'mb_do_register' ) ) {
+            wp_die( esc_html__( 'Erreur de sécurité — rechargez la page.', MB_TEXT_DOMAIN ) );
+        }
+
+        $login_page  = get_option( 'mb_login_page_url', '' ) ?: wp_login_url();
+        $reg_page    = add_query_arg( 'tab', 'register', $login_page );
+        $redirect_to = isset( $_POST['redirect_to'] ) ? esc_url_raw( wp_unslash( $_POST['redirect_to'] ) ) : '';
+
+        if ( ! get_option( 'users_can_register' ) ) {
+            wp_safe_redirect( add_query_arg( 'mb_login_error', rawurlencode( 'Les inscriptions sont fermées.' ), $reg_page ) );
+            exit;
+        }
+
+        $user_login = isset( $_POST['user_login'] ) ? sanitize_user( wp_unslash( $_POST['user_login'] ) ) : '';
+        $user_email = isset( $_POST['user_email'] ) ? sanitize_email( wp_unslash( $_POST['user_email'] ) ) : '';
+        $user_pass  = isset( $_POST['user_pass'] )  ? wp_unslash( $_POST['user_pass'] ) : '';
+
+        if ( ! $user_login || ! $user_email || ! $user_pass ) {
+            wp_safe_redirect( add_query_arg( 'mb_login_error', rawurlencode( 'Tous les champs sont requis.' ), $reg_page ) );
+            exit;
+        }
+
+        if ( strlen( $user_pass ) < 8 ) {
+            wp_safe_redirect( add_query_arg( 'mb_login_error', rawurlencode( 'Le mot de passe doit contenir au moins 8 caractères.' ), $reg_page ) );
+            exit;
+        }
+
+        $user_id = wp_create_user( $user_login, $user_pass, $user_email );
+
+        if ( is_wp_error( $user_id ) ) {
+            wp_safe_redirect( add_query_arg( 'mb_login_error', rawurlencode( $user_id->get_error_message() ), $reg_page ) );
+            exit;
+        }
+
+        wp_set_auth_cookie( $user_id, false, is_ssl() );
+
+        if ( $redirect_to ) {
+            $safe = wp_validate_redirect( $redirect_to, $login_page );
+            wp_safe_redirect( $safe );
+        } else {
+            wp_safe_redirect( add_query_arg( 'mb_login_success', rawurlencode( 'Compte créé avec succès ! Bienvenue !' ), $login_page ) );
+        }
+        exit;
+    }
+
+    // ── Save user progress ────────────────────────────────────────────────────
+    public static function handle_save_progress(): void {
+        check_ajax_referer( 'mb_report_nonce', 'nonce' );
+
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( [ 'message' => 'Non connecté.' ] );
+            return;
+        }
+
+        $qcm_id = isset( $_POST['qcm_id'] ) ? (int) $_POST['qcm_id'] : 0;
+        $score  = isset( $_POST['score'] )   ? (int) $_POST['score']   : 0;
+        $total  = isset( $_POST['total'] )   ? (int) $_POST['total']   : 0;
+
+        if ( ! $qcm_id || $total <= 0 ) {
+            wp_send_json_error( [ 'message' => 'Données invalides.' ] );
+            return;
+        }
+
+        global $wpdb;
+        $wpdb->replace(
+            $wpdb->prefix . 'mb_user_progress',
+            [
+                'user_id'      => get_current_user_id(),
+                'qcm_id'       => $qcm_id,
+                'score'        => min( $score, $total ),
+                'total'        => $total,
+                'completed_at' => current_time( 'mysql' ),
+            ],
+            [ '%d', '%d', '%d', '%d', '%s' ]
+        );
+
+        wp_send_json_success( [ 'message' => 'Progression enregistrée.' ] );
     }
 
     // ── PayPal server-side verification ───────────────────────────────────────

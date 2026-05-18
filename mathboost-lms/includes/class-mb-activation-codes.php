@@ -66,9 +66,9 @@ class MB_Activation_Codes {
             [ '%d' ]
         );
 
-        // Grant premium
-        $days = (int) get_option( 'mb_premium_duration', 365 );
-        self::grant_premium( $user_id, $days );
+        // Grant exactly 1 year (codes always give 365 days, no exceptions)
+        self::grant_premium( $user_id, 365 );
+        update_user_meta( $user_id, 'mb_activation_code', $code );
 
         return [ 'success' => true, 'message' => __( 'Félicitations ! Votre accès premium est activé.', MB_TEXT_DOMAIN ) ];
     }

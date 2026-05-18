@@ -11,7 +11,8 @@ class MB_Admin {
         add_filter( 'admin_footer_text',     [ __CLASS__, 'admin_footer_version' ] );
 
         // AJAX
-        add_action( 'wp_ajax_mb_admin_toggle_lock', [ __CLASS__, 'handle_toggle_lock' ] );
+        add_action( 'wp_ajax_mb_admin_toggle_lock',      [ __CLASS__, 'handle_toggle_lock' ] );
+        add_action( 'wp_ajax_mb_admin_create_category',  [ __CLASS__, 'handle_create_category' ] );
 
         // admin-post handlers (always registered)
         add_action( 'admin_post_mb_save_qcm',      [ __CLASS__, 'handle_save_qcm' ] );
@@ -249,8 +250,36 @@ jQuery(function($){
         }
 
         $current_cat_ids = $qcm_id ? MB_QCM_Repository::get_category_ids( $qcm_id ) : [];
-        $all_levels      = MB_Level_Repository::get_all();
+        $top_levels      = MB_Level_Repository::get_top_level();
         $questions_json  = $qcm ? ( $qcm->questions ?: '[]' ) : '[]';
+
+        // Build flat child-level list for the dropdown
+        $child_levels = [];
+        foreach ( $top_levels as $parent ) {
+            $kids = MB_Level_Repository::get_children( (int) $parent->id );
+            if ( ! empty( $kids ) ) {
+                foreach ( $kids as $kid ) {
+                    $child_levels[] = [
+                        'id'    => (int) $kid->id,
+                        'label' => $parent->name . ' › ' . $kid->name,
+                    ];
+                }
+            } else {
+                $child_levels[] = [
+                    'id'    => (int) $parent->id,
+                    'label' => $parent->name,
+                ];
+            }
+        }
+
+        // Pre-select the level matching the first assigned category
+        $selected_level_id = 0;
+        if ( ! empty( $current_cat_ids ) ) {
+            $first_cat = MB_Category_Repository::get_by_id( $current_cat_ids[0] );
+            if ( $first_cat && $first_cat->level_id ) {
+                $selected_level_id = (int) $first_cat->level_id;
+            }
+        }
         $page_title      = $qcm ? __( 'Modifier le QCM', MB_TEXT_DOMAIN ) : __( 'Ajouter un QCM', MB_TEXT_DOMAIN );
         $back_url        = admin_url( 'admin.php?page=mb-qcms' );
         ?>
@@ -391,21 +420,75 @@ jQuery(function($){
                   </div>
 
                   <div class="postbox">
-                    <h2 class="hndle"><span><?php esc_html_e( 'Catégories', MB_TEXT_DOMAIN ); ?></span></h2>
-                    <div class="inside" style="max-height:300px;overflow-y:auto">
-                      <?php foreach ( $all_levels as $lvl ) :
-                        $lvl_cats = MB_Category_Repository::get_by_level( (int) $lvl->id );
-                        if ( empty( $lvl_cats ) ) continue;
-                      ?>
-                        <p style="font-weight:600;margin:8px 0 4px"><?php echo esc_html( $lvl->name ); ?></p>
-                        <?php foreach ( $lvl_cats as $cat ) : ?>
-                          <label style="display:block;margin-left:12px">
-                            <input type="checkbox" name="mb_categories[]" value="<?php echo (int) $cat->id; ?>"
-                                   <?php checked( in_array( (int) $cat->id, $current_cat_ids, true ) ); ?>>
-                            <?php echo esc_html( $cat->name ); ?>
-                          </label>
-                        <?php endforeach; ?>
-                      <?php endforeach; ?>
+                    <h2 class="hndle"><span><?php esc_html_e( 'Niveau & Catégories', MB_TEXT_DOMAIN ); ?></span></h2>
+                    <div class="inside">
+
+                      <?php if ( empty( $child_levels ) ) : ?>
+                        <p style="color:#999;font-style:italic;font-size:.88em">
+                          <?php esc_html_e( 'Aucun niveau disponible.', MB_TEXT_DOMAIN ); ?>
+                        </p>
+                      <?php else : ?>
+
+                        <!-- ── Level dropdown ── -->
+                        <label style="display:block;margin-bottom:10px">
+                          <strong style="display:block;margin-bottom:4px"><?php esc_html_e( 'Niveau', MB_TEXT_DOMAIN ); ?></strong>
+                          <select id="mb-level-filter" style="width:100%">
+                            <option value=""><?php esc_html_e( '— Tous les niveaux —', MB_TEXT_DOMAIN ); ?></option>
+                            <?php foreach ( $child_levels as $cl ) : ?>
+                              <option value="<?php echo (int) $cl['id']; ?>"
+                                <?php selected( $selected_level_id, $cl['id'] ); ?>>
+                                <?php echo esc_html( $cl['label'] ); ?>
+                              </option>
+                            <?php endforeach; ?>
+                          </select>
+                        </label>
+
+                        <!-- ── Category checkboxes, one group per child level ── -->
+                        <div id="mb-cat-groups" style="max-height:220px;overflow-y:auto;border:1px solid #ddd;border-radius:4px;padding:6px 8px;margin-bottom:10px">
+                          <?php foreach ( $child_levels as $cl ) :
+                            $lvl_cats  = MB_Category_Repository::get_by_level( $cl['id'] );
+                            $is_vis    = ( ! $selected_level_id || $selected_level_id === $cl['id'] );
+                          ?>
+                            <div class="mb-cat-group" data-level-id="<?php echo (int) $cl['id']; ?>"
+                                 style="<?php echo $is_vis ? '' : 'display:none'; ?>">
+                              <p style="font-weight:700;font-size:.78em;letter-spacing:.6px;text-transform:uppercase;color:#888;margin:6px 0 3px">
+                                <?php echo esc_html( $cl['label'] ); ?>
+                              </p>
+                              <div class="mb-cat-list">
+                                <?php if ( empty( $lvl_cats ) ) : ?>
+                                  <p class="mb-no-cat" style="color:#bbb;font-size:.82em;font-style:italic;margin:0 0 4px 4px">
+                                    <?php esc_html_e( 'Aucune catégorie — créez-en ci-dessous.', MB_TEXT_DOMAIN ); ?>
+                                  </p>
+                                <?php else : ?>
+                                  <?php foreach ( $lvl_cats as $cat ) : ?>
+                                    <label style="display:block;margin:1px 0 1px 4px">
+                                      <input type="checkbox" name="mb_categories[]"
+                                             value="<?php echo (int) $cat->id; ?>"
+                                             <?php checked( in_array( (int) $cat->id, $current_cat_ids, true ) ); ?>>
+                                      <?php echo esc_html( $cat->name ); ?>
+                                    </label>
+                                  <?php endforeach; ?>
+                                <?php endif; ?>
+                              </div>
+                            </div>
+                          <?php endforeach; ?>
+                        </div>
+
+                        <!-- ── Quick-create category ── -->
+                        <div style="border-top:1px solid #eee;padding-top:10px">
+                          <strong style="display:block;font-size:.88em;margin-bottom:6px">
+                            + <?php esc_html_e( 'Créer une catégorie', MB_TEXT_DOMAIN ); ?>
+                          </strong>
+                          <input type="text" id="mb-new-cat-name" class="widefat"
+                                 placeholder="<?php esc_attr_e( 'Ex : Nombres et calculs', MB_TEXT_DOMAIN ); ?>"
+                                 style="margin-bottom:5px">
+                          <button type="button" id="mb-create-cat" class="button" style="width:100%">
+                            <?php esc_html_e( '+ Ajouter la catégorie', MB_TEXT_DOMAIN ); ?>
+                          </button>
+                          <span id="mb-cat-status" style="display:block;font-size:.82em;margin-top:4px;color:#888"></span>
+                        </div>
+
+                      <?php endif; ?>
                     </div>
                   </div>
 
@@ -415,6 +498,81 @@ jQuery(function($){
             </div><!-- #poststuff -->
           </form>
         </div>
+
+        <script>
+        (function($){
+          var $filter  = $('#mb-level-filter');
+          var $groups  = $('.mb-cat-group');
+
+          // Filter category groups when level changes
+          $filter.on('change', function(){
+            var val = $(this).val();
+            if ( ! val ) {
+              $groups.show();
+            } else {
+              $groups.hide().filter('[data-level-id="' + val + '"]').show();
+            }
+          });
+
+          // Quick-create category via AJAX
+          $('#mb-create-cat').on('click', function(){
+            var name    = $('#mb-new-cat-name').val().trim();
+            var levelId = $filter.val();
+            var $status = $('#mb-cat-status');
+
+            if ( ! name ) {
+              $status.css('color','#c00').text('<?php echo esc_js( __( 'Saisissez un nom de catégorie.', MB_TEXT_DOMAIN ) ); ?>');
+              return;
+            }
+
+            $(this).prop('disabled', true);
+            $status.css('color','#888').text('<?php echo esc_js( __( 'Création…', MB_TEXT_DOMAIN ) ); ?>');
+
+            $.post(mbAdmin.ajaxUrl, {
+              action:   'mb_admin_create_category',
+              nonce:    mbAdmin.nonce,
+              name:     name,
+              level_id: levelId,
+            }, function(r){
+              if ( r && r.success ) {
+                var cat     = r.data;
+                var groupSel = '.mb-cat-group[data-level-id="' + cat.level_id + '"]';
+                var $group  = $( groupSel );
+
+                if ( $group.length ) {
+                  $group.find('.mb-no-cat').remove();
+                  $group.find('.mb-cat-list').append(
+                    '<label style="display:block;margin:1px 0 1px 4px">' +
+                    '<input type="checkbox" name="mb_categories[]" value="' + cat.id + '" checked> ' +
+                    $('<span>').text(cat.name).html() + '</label>'
+                  );
+                  // Auto-select this level in filter
+                  if ( ! $filter.val() || $filter.val() == cat.level_id ) {
+                    $filter.val(cat.level_id).trigger('change');
+                  }
+                } else {
+                  // Level not yet in dropdown (edge case) — reload
+                  location.reload();
+                }
+
+                $('#mb-new-cat-name').val('');
+                $status.css('color','green').text('✓ ' + cat.name + ' <?php echo esc_js( __( 'créée !', MB_TEXT_DOMAIN ) ); ?>');
+                setTimeout(function(){ $status.text(''); }, 4000);
+              } else {
+                var msg = (r && r.data && r.data.message) ? r.data.message : '<?php echo esc_js( __( 'Erreur.', MB_TEXT_DOMAIN ) ); ?>';
+                $status.css('color','#c00').text(msg);
+              }
+            }).always(function(){
+              $('#mb-create-cat').prop('disabled', false);
+            });
+          });
+
+          // Also trigger on Enter key in name field
+          $('#mb-new-cat-name').on('keydown', function(e){
+            if (e.which === 13) { e.preventDefault(); $('#mb-create-cat').trigger('click'); }
+          });
+        })(jQuery);
+        </script>
         <?php
     }
 
@@ -493,6 +651,43 @@ jQuery(function($){
             update_post_meta( $post_id, '_mb_locked', $new );
             wp_send_json_success( [ 'locked' => $new ] );
         }
+    }
+
+    // ── AJAX: quick-create category from QCM editor sidebar ──────────────────
+    public static function handle_create_category(): void {
+        check_ajax_referer( 'mb_admin_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => 'Accès refusé.' ] );
+        }
+
+        $name     = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
+        $level_id = isset( $_POST['level_id'] ) && $_POST['level_id'] !== ''
+                    ? (int) $_POST['level_id'] : null;
+
+        if ( ! $name ) {
+            wp_send_json_error( [ 'message' => __( 'Nom requis.', MB_TEXT_DOMAIN ) ] );
+        }
+
+        // Ensure slug is unique by appending a counter if needed
+        $base_slug = sanitize_title( $name );
+        $slug      = $base_slug;
+        $i         = 1;
+        while ( MB_Category_Repository::get_by_slug( $slug ) ) {
+            $slug = $base_slug . '-' . $i++;
+        }
+
+        $id = MB_Category_Repository::save( [
+            'name'     => $name,
+            'slug'     => $slug,
+            'level_id' => $level_id,
+        ] );
+
+        wp_send_json_success( [
+            'id'       => $id,
+            'name'     => $name,
+            'level_id' => $level_id,
+        ] );
     }
 
     // ── Levels page ───────────────────────────────────────────────────────────
@@ -982,7 +1177,7 @@ jQuery(function($){
         foreach ( [
             'mb_paypal_client_id', 'mb_paypal_secret', 'mb_price', 'mb_currency',
             'mb_max_sessions', 'mb_free_locked_count', 'mb_premium_duration',
-            'mb_email_contact', 'mb_payment_page_url',
+            'mb_email_contact', 'mb_payment_page_url', 'mb_login_page_url',
         ] as $opt ) {
             register_setting( 'mb_settings_group', $opt );
         }
@@ -1016,8 +1211,12 @@ jQuery(function($){
                 <td><input type="email" name="mb_email_contact" value="<?php echo esc_attr( get_option( 'mb_email_contact' ) ); ?>" class="regular-text"></td></tr>
               <tr><th><?php esc_html_e( 'URL page paiement', MB_TEXT_DOMAIN ); ?></th>
                 <td><input type="url" name="mb_payment_page_url" value="<?php echo esc_attr( get_option( 'mb_payment_page_url' ) ); ?>" class="regular-text"
-                           placeholder="https://mathboost.net/abonnement/">
-                  <p class="description"><?php esc_html_e( 'URL vers la page PayPal quand un QCM est verrouillé.', MB_TEXT_DOMAIN ); ?></p></td></tr>
+                           placeholder="https://mathboost.net/premium/">
+                  <p class="description"><?php esc_html_e( 'URL vers la page premium quand un QCM est verrouillé. Créée automatiquement à l\'activation.', MB_TEXT_DOMAIN ); ?></p></td></tr>
+              <tr><th><?php esc_html_e( 'URL page connexion', MB_TEXT_DOMAIN ); ?></th>
+                <td><input type="url" name="mb_login_page_url" value="<?php echo esc_attr( get_option( 'mb_login_page_url' ) ); ?>" class="regular-text"
+                           placeholder="https://mathboost.net/connexion/">
+                  <p class="description"><?php esc_html_e( 'URL de la page de connexion personnalisée. Créée automatiquement à l\'activation.', MB_TEXT_DOMAIN ); ?></p></td></tr>
             </table>
             <?php submit_button(); ?>
           </form>

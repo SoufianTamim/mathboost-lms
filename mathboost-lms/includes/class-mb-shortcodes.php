@@ -11,6 +11,7 @@ class MB_Shortcodes {
         add_shortcode( 'mathboost_qcm',             [ __CLASS__, 'qcm_single' ] );
         add_shortcode( 'mathboost_activation_form', [ __CLASS__, 'activation_form' ] );
         add_shortcode( 'mathboost_payment',         [ __CLASS__, 'payment_block' ] );
+        add_shortcode( 'mathboost_login',           [ __CLASS__, 'login_block' ] );
     }
 
     public static function resources( array $atts = [] ): string {
@@ -82,6 +83,12 @@ class MB_Shortcodes {
     public static function payment_block( array $atts = [] ): string {
         ob_start();
         include MB_PLUGIN_DIR . 'frontend/templates/payment.php';
+        return ob_get_clean();
+    }
+
+    public static function login_block( array $atts = [] ): string {
+        ob_start();
+        include MB_PLUGIN_DIR . 'frontend/templates/login.php';
         return ob_get_clean();
     }
 }

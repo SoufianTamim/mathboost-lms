@@ -6,6 +6,7 @@ class MB_Frontend {
     public static function init() {
         add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue' ] );
         add_filter( 'mb_upgrade_url',     [ __CLASS__, 'get_upgrade_url' ] );
+        add_filter( 'login_url',          [ __CLASS__, 'custom_login_url' ], 10, 3 );
 
         // CPT-specific hooks are only relevant before migration
         if ( ! MB_Migrator::is_done() ) {
@@ -17,6 +18,20 @@ class MB_Frontend {
     public static function get_upgrade_url( string $url ): string {
         $saved = get_option( 'mb_payment_page_url', '' );
         return $saved ?: $url;
+    }
+
+    public static function custom_login_url( string $login_url, string $redirect, bool $force_reauth ): string {
+        if ( $force_reauth ) {
+            return $login_url;
+        }
+        $custom = get_option( 'mb_login_page_url', '' );
+        if ( ! $custom ) {
+            return $login_url;
+        }
+        if ( $redirect ) {
+            $custom = add_query_arg( 'redirect_to', rawurlencode( $redirect ), $custom );
+        }
+        return $custom;
     }
 
     public static function enqueue() {

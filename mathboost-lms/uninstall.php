@@ -15,6 +15,7 @@ $tables = [
     'mb_activation_codes',
     'mb_sessions',
     'mb_error_reports',
+    'mb_user_progress',
 ];
 
 foreach ( $tables as $table ) {
@@ -33,6 +34,7 @@ $options = [
     'mb_premium_duration',
     'mb_email_contact',
     'mb_payment_page_url',
+    'mb_login_page_url',
     'mb_db_version',
 ];
 
