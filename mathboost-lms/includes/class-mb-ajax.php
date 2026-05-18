@@ -351,6 +351,10 @@ class MB_Ajax {
             exit;
         }
 
+        // Force subscriber role — never let the WP default_role grant admin
+        $new_user = new WP_User( $user_id );
+        $new_user->set_role( 'subscriber' );
+
         // Auto-login
         wp_set_auth_cookie( $user_id, false, is_ssl() );
 
