@@ -126,6 +126,21 @@ class MB_Activator {
             KEY          user_id (user_id)
         ) $charset_collate;";
 
+        // ── PayPal purchases log ──────────────────────────────────────────────
+        $sql_purchases = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}mb_paypal_purchases (
+            id              BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            paypal_order_id VARCHAR(64)         NOT NULL,
+            user_id         BIGINT(20) UNSIGNED NOT NULL,
+            amount          DECIMAL(8,2)        NOT NULL,
+            currency        VARCHAR(10)         NOT NULL DEFAULT 'EUR',
+            activation_code VARCHAR(20)                  DEFAULT NULL,
+            email_sent      TINYINT(1)          NOT NULL DEFAULT 0,
+            created_at      DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY paypal_order_id (paypal_order_id),
+            KEY user_id (user_id)
+        ) $charset_collate;";
+
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         dbDelta( $sql_codes );
         dbDelta( $sql_sessions );
@@ -135,6 +150,7 @@ class MB_Activator {
         dbDelta( $sql_qcms );
         dbDelta( $sql_qcm_cats );
         dbDelta( $sql_progress );
+        dbDelta( $sql_purchases );
 
         update_option( 'mb_db_version', MB_VERSION );
     }
@@ -147,10 +163,11 @@ class MB_Activator {
         add_option( 'mb_free_locked_count', '3' );
         add_option( 'mb_email_contact',     get_option( 'admin_email' ) );
         add_option( 'mb_premium_duration',  '365' ); // days, 0 = lifetime
-        add_option( 'mb_allow_register',    '1' );
-        add_option( 'mb_login_page_url',    '' );
-        add_option( 'mb_register_page_url', '' );
-        add_option( 'mb_payment_page_url',  '' );
+        add_option( 'mb_allow_register',      '1' );
+        add_option( 'mb_login_page_url',      '' );
+        add_option( 'mb_register_page_url',   '' );
+        add_option( 'mb_payment_page_url',    '' );
+        add_option( 'mb_resources_page_url',  '' );
     }
 
     // ── Auto-create login and payment pages if they don't exist ──────────────

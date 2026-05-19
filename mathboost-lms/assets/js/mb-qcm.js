@@ -273,9 +273,18 @@
           if (msgEl) {
             msgEl.style.display = 'block';
             msgEl.className     = 'mb-activation-msg ' + (r.success ? 'is-success' : 'is-error');
-            msgEl.textContent   = r.data ? r.data.message : 'Erreur';
+            msgEl.innerHTML     = (r.data ? r.data.message : 'Erreur');
+            if (r.success && cfg.resourcesUrl) {
+              msgEl.innerHTML +=
+                ' <a href="' + cfg.resourcesUrl + '" class="mb-btn mb-btn-start" style="margin-top:12px;display:inline-block">' +
+                '🚀 Accéder aux ressources</a>';
+            }
           }
-          if (r.success) setTimeout(function () { location.reload(); }, 1500);
+          if (r.success) {
+            setTimeout(function () {
+              window.location.href = cfg.resourcesUrl || location.href;
+            }, 3000);
+          }
         })
         .finally(function () {
           btn.disabled    = false;
@@ -302,30 +311,53 @@
     var status    = document.getElementById('mb-paypal-status');
     if (!container) return;
 
+    function showStatus(success, msg) {
+      if (!status) return;
+      status.style.display = 'block';
+      status.className     = 'mb-activation-msg ' + (success ? 'is-success' : 'is-error');
+      status.textContent   = msg;
+    }
+
     window.paypal.Buttons({
+      style: { layout: 'vertical', color: 'blue', shape: 'rect', label: 'pay' },
+
       createOrder: function (data, actions) {
         return actions.order.create({
-          purchase_units: [{ amount: { value: cfg.price, currency_code: cfg.currency } }]
+          purchase_units: [{
+            amount: { value: cfg.price, currency_code: cfg.currency },
+            description: 'MathBoost Premium'
+          }]
         });
       },
+
       onApprove: function (data, actions) {
+        showStatus(true, 'Traitement en cours…');
         return actions.order.capture().then(function () {
           var fd = new FormData();
           fd.append('action',   'mb_paypal_confirm');
           fd.append('nonce',    cfg.nonce);
           fd.append('order_id', data.orderID);
-          fetch(cfg.ajaxUrl, { method: 'POST', body: fd })
+          return fetch(cfg.ajaxUrl, { method: 'POST', body: fd })
             .then(function (r) { return r.json(); })
             .then(function (r) {
-              if (status) {
-                status.style.display = 'block';
-                status.className     = 'mb-activation-msg ' + (r.success ? 'is-success' : 'is-error');
-                status.textContent   = r.data ? r.data.message : 'Erreur';
-              }
-              if (r.success) setTimeout(function () { location.reload(); }, 2000);
+              showStatus(r.success, r.data ? r.data.message : 'Erreur inattendue.');
+              if (r.success) setTimeout(function () { location.reload(); }, 2500);
+            })
+            .catch(function () {
+              showStatus(false, 'Erreur réseau. Votre paiement a été reçu — contactez le support si l\'accès n\'est pas activé.');
             });
         });
+      },
+
+      onCancel: function () {
+        showStatus(false, 'Paiement annulé. Vous pouvez réessayer quand vous le souhaitez.');
+      },
+
+      onError: function (err) {
+        showStatus(false, 'Erreur PayPal. Veuillez réessayer ou contacter le support.');
+        console.error('PayPal error:', err);
       }
+
     }).render('#mb-paypal-container');
   });
 

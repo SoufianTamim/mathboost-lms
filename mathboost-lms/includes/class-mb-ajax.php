@@ -193,26 +193,89 @@ class MB_Ajax {
 
         if ( ! is_user_logged_in() ) {
             wp_send_json_error( [ 'message' => __( 'Non connecté.', MB_TEXT_DOMAIN ) ] );
+            return;
         }
 
         $order_id = isset( $_POST['order_id'] ) ? sanitize_text_field( wp_unslash( $_POST['order_id'] ) ) : '';
         if ( ! $order_id ) {
             wp_send_json_error( [ 'message' => __( 'Commande invalide.', MB_TEXT_DOMAIN ) ] );
+            return;
         }
 
+        // Duplicate order guard — prevent the same PayPal order from being processed twice
+        global $wpdb;
+        $already_processed = $wpdb->get_var( $wpdb->prepare(
+            "SELECT id FROM {$wpdb->prefix}mb_paypal_purchases WHERE paypal_order_id = %s LIMIT 1",
+            $order_id
+        ) );
+        if ( $already_processed ) {
+            wp_send_json_error( [ 'message' => __( 'Cette commande a déjà été traitée.', MB_TEXT_DOMAIN ) ] );
+            return;
+        }
+
+        // Verify with PayPal REST API: must be COMPLETED, EUR, >= €15
         $verified = self::verify_paypal_order( $order_id );
         if ( ! $verified ) {
-            wp_send_json_error( [ 'message' => __( 'Paiement non vérifié.', MB_TEXT_DOMAIN ) ] );
+            wp_send_json_error( [ 'message' => __( 'Paiement non vérifié. Veuillez contacter le support.', MB_TEXT_DOMAIN ) ] );
+            return;
         }
 
         $user_id = get_current_user_id();
-        $days    = (int) get_option( 'mb_premium_duration', 365 );
+        $user    = get_userdata( $user_id );
+
+        // Grant premium immediately
+        $days = (int) get_option( 'mb_premium_duration', 365 );
         MB_Activation_Codes::grant_premium( $user_id, $days );
+
+        // Generate a unique activation code and pre-assign it to this purchase
+        $codes           = MB_Activation_Codes::generate( 1, null, 'PayPal: ' . $order_id );
+        $activation_code = $codes[0] ?? '';
+
+        if ( $activation_code ) {
+            // Mark code as used so it cannot be activated again manually
+            $wpdb->update(
+                $wpdb->prefix . 'mb_activation_codes',
+                [
+                    'user_id' => $user_id,
+                    'used_at' => current_time( 'mysql' ),
+                ],
+                [ 'code' => $activation_code ],
+                [ '%d', '%s' ],
+                [ '%s' ]
+            );
+            update_user_meta( $user_id, 'mb_activation_code', $activation_code );
+        }
 
         update_user_meta( $user_id, 'mb_last_paypal_order', $order_id );
         update_user_meta( $user_id, 'mb_payment_date',      current_time( 'mysql' ) );
 
-        wp_send_json_success( [ 'message' => __( 'Paiement confirmé ! Accès premium activé.', MB_TEXT_DOMAIN ) ] );
+        // Send activation code by email; log delivery status regardless
+        $email_sent = 0;
+        if ( $activation_code && $user && $user->user_email ) {
+            $email_sent = self::send_activation_code_email(
+                $user->user_email,
+                $user->display_name ?: $user->user_login,
+                $activation_code
+            ) ? 1 : 0;
+        }
+
+        // Log purchase with code and email delivery status
+        $wpdb->insert(
+            $wpdb->prefix . 'mb_paypal_purchases',
+            [
+                'paypal_order_id' => $order_id,
+                'user_id'         => $user_id,
+                'amount'          => '15.00',
+                'currency'        => 'EUR',
+                'activation_code' => $activation_code,
+                'email_sent'      => $email_sent,
+            ],
+            [ '%s', '%d', '%s', '%s', '%s', '%d' ]
+        );
+
+        wp_send_json_success( [
+            'message' => __( 'Paiement confirmé ! Votre accès premium est activé et votre code d\'activation a été envoyé par email.', MB_TEXT_DOMAIN ),
+        ] );
     }
 
     // ── Admin: generate codes ─────────────────────────────────────────────────
@@ -425,7 +488,8 @@ class MB_Ajax {
                 'Authorization' => 'Basic ' . base64_encode( "$client_id:$client_secret" ),
                 'Content-Type'  => 'application/x-www-form-urlencoded',
             ],
-            'body' => 'grant_type=client_credentials',
+            'body'    => 'grant_type=client_credentials',
+            'timeout' => 30,
         ] );
 
         if ( is_wp_error( $token_response ) ) {
@@ -444,6 +508,7 @@ class MB_Ajax {
                 'Authorization' => "Bearer $access_token",
                 'Content-Type'  => 'application/json',
             ],
+            'timeout' => 30,
         ] );
 
         if ( is_wp_error( $order_response ) ) {
@@ -451,10 +516,50 @@ class MB_Ajax {
         }
 
         $order_data = json_decode( wp_remote_retrieve_body( $order_response ), true );
-        $status     = $order_data['status'] ?? '';
-        $amount     = $order_data['purchase_units'][0]['amount']['value'] ?? 0;
-        $expected   = (float) get_option( 'mb_price', '15' );
+        $status     = $order_data['status']                                        ?? '';
+        $amount     = (float) ( $order_data['purchase_units'][0]['amount']['value']         ?? 0 );
+        $currency   = $order_data['purchase_units'][0]['amount']['currency_code']  ?? '';
 
-        return $status === 'COMPLETED' && (float) $amount >= $expected;
+        // Price is locked at €15 — never read from option to prevent price manipulation
+        return $status === 'COMPLETED'
+            && $currency === 'EUR'
+            && $amount >= 15.00;
+    }
+
+    // ── Send activation code email ────────────────────────────────────────────
+    public static function send_activation_code_email( string $to, string $name, string $code ): bool {
+        $site_name   = get_bloginfo( 'name' );
+        $admin_email = get_option( 'admin_email' );
+
+        $subject = sprintf(
+            /* translators: %s site name */
+            __( '[%s] Votre code d\'activation Premium', MB_TEXT_DOMAIN ),
+            $site_name
+        );
+
+        $message  = '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">' . "\n";
+        $message .= '<h2 style="color:#2563eb;margin-bottom:8px">Bienvenue dans MathBoost Premium !</h2>' . "\n";
+        $message .= '<p>Bonjour <strong>' . esc_html( $name ) . '</strong>,</p>' . "\n";
+        $message .= '<p>Votre paiement de <strong>15,00 €</strong> a bien été confirmé.<br>';
+        $message .= 'Votre accès premium est désormais <strong>actif</strong>.</p>' . "\n";
+        $message .= '<p style="margin-top:24px">Voici votre code d\'activation personnel :</p>' . "\n";
+        $message .= '<div style="background:#f0f4ff;border:2px solid #2563eb;border-radius:8px;';
+        $message .= 'padding:24px;text-align:center;margin:16px 0">' . "\n";
+        $message .= '<span style="font-size:30px;font-weight:bold;letter-spacing:6px;color:#1e40af">';
+        $message .= esc_html( $code );
+        $message .= '</span>' . "\n";
+        $message .= '</div>' . "\n";
+        $message .= '<p style="font-size:13px;color:#555">Conservez ce code précieusement — il est lié à votre compte ';
+        $message .= 'et peut vous servir pour réactiver votre accès si nécessaire.</p>' . "\n";
+        $message .= '<hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">' . "\n";
+        $message .= '<p style="margin:0">Bonne préparation !<br><strong>L\'équipe ' . esc_html( $site_name ) . '</strong></p>' . "\n";
+        $message .= '</div>';
+
+        $headers = [
+            'Content-Type: text/html; charset=UTF-8',
+            'From: ' . $site_name . ' <' . $admin_email . '>',
+        ];
+
+        return (bool) wp_mail( $to, $subject, $message, $headers );
     }
 }

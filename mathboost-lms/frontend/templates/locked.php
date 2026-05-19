@@ -30,7 +30,7 @@ $symbol      = $currency === 'EUR' ? '€' : '$';
 
   <div class="mb-locked-actions">
     <a class="mb-btn mb-btn-upgrade mb-btn-large" href="<?php echo esc_url( $upgrade_url ); ?>">
-      🚀 <?php esc_html_e( 'Débloquer l\'accès Premium', MB_TEXT_DOMAIN ); ?>
+      🚀 <?php esc_html_e( 'Obtenir l\'accès Premium', MB_TEXT_DOMAIN ); ?>
     </a>
     <?php if ( ! is_user_logged_in() ) : ?>
       <a class="mb-btn mb-btn-outline" href="<?php echo esc_url( wp_login_url( get_permalink() ) ); ?>">
@@ -47,5 +47,12 @@ $symbol      = $currency === 'EUR' ? '€' : '$';
     <div id="activation-form">
       <?php echo do_shortcode( '[mathboost_activation_form]' ); ?>
     </div>
+  <?php else : ?>
+    <p class="mb-locked-code-hint">
+      <?php esc_html_e( 'Vous avez déjà un code d\'activation ?', MB_TEXT_DOMAIN ); ?>
+      <a href="<?php echo esc_url( wp_login_url( get_permalink() ) ); ?>">
+        <?php esc_html_e( 'Connectez-vous pour l\'activer', MB_TEXT_DOMAIN ); ?>
+      </a>
+    </p>
   <?php endif; ?>
 </div>

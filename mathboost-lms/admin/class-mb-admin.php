@@ -13,6 +13,7 @@ class MB_Admin {
         // AJAX
         add_action( 'wp_ajax_mb_admin_toggle_lock',      [ __CLASS__, 'handle_toggle_lock' ] );
         add_action( 'wp_ajax_mb_admin_create_category',  [ __CLASS__, 'handle_create_category' ] );
+        add_action( 'wp_ajax_mb_admin_resend_code_email', [ __CLASS__, 'handle_resend_code_email' ] );
 
         // admin-post handlers (always registered)
         add_action( 'admin_post_mb_save_qcm',      [ __CLASS__, 'handle_save_qcm' ] );
@@ -47,6 +48,7 @@ class MB_Admin {
         add_submenu_page( 'mb-qcms', __( 'Niveaux', MB_TEXT_DOMAIN ),     __( 'Niveaux', MB_TEXT_DOMAIN ),     'manage_options', 'mb-levels',     [ __CLASS__, 'page_levels' ] );
         add_submenu_page( 'mb-qcms', __( 'Catégories', MB_TEXT_DOMAIN ),  __( 'Catégories', MB_TEXT_DOMAIN ),  'manage_options', 'mb-categories', [ __CLASS__, 'page_categories' ] );
         add_submenu_page( 'mb-qcms', __( 'Codes', MB_TEXT_DOMAIN ),       __( 'Codes', MB_TEXT_DOMAIN ),       'manage_options', 'mb-codes',      [ __CLASS__, 'page_codes' ] );
+        add_submenu_page( 'mb-qcms', __( 'Paiements', MB_TEXT_DOMAIN ),   __( 'Paiements', MB_TEXT_DOMAIN ),   'manage_options', 'mb-payments',   [ __CLASS__, 'page_payments' ] );
         add_submenu_page( 'mb-qcms', __( 'Signalements', MB_TEXT_DOMAIN ),__( 'Signalements', MB_TEXT_DOMAIN ),'manage_options', 'mb-reports',    [ __CLASS__, 'page_reports' ] );
         add_submenu_page( 'mb-qcms', __( 'Réglages', MB_TEXT_DOMAIN ),    __( 'Réglages', MB_TEXT_DOMAIN ),    'manage_options', 'mb-settings',   [ __CLASS__, 'page_settings' ] );
     }
@@ -1117,6 +1119,139 @@ jQuery(function($){
     }
 
     // ── Reports page ─────────────────────────────────────────────────────────
+    // ── Payments page ─────────────────────────────────────────────────────────
+    public static function page_payments() {
+        global $wpdb;
+        $table = $wpdb->prefix . 'mb_paypal_purchases';
+
+        $purchases = $wpdb->get_results(
+            "SELECT p.*, u.user_login, u.user_email
+             FROM {$table} p
+             LEFT JOIN {$wpdb->users} u ON u.ID = p.user_id
+             ORDER BY p.created_at DESC LIMIT 200"
+        );
+        ?>
+        <div class="wrap">
+          <h1><?php esc_html_e( 'Paiements PayPal', MB_TEXT_DOMAIN ); ?></h1>
+          <table class="wp-list-table widefat fixed striped">
+            <thead>
+              <tr>
+                <th style="width:60px">ID</th>
+                <th><?php esc_html_e( 'Commande PayPal', MB_TEXT_DOMAIN ); ?></th>
+                <th><?php esc_html_e( 'Utilisateur', MB_TEXT_DOMAIN ); ?></th>
+                <th style="width:90px"><?php esc_html_e( 'Montant', MB_TEXT_DOMAIN ); ?></th>
+                <th><?php esc_html_e( 'Code d\'activation', MB_TEXT_DOMAIN ); ?></th>
+                <th style="width:80px"><?php esc_html_e( 'Email', MB_TEXT_DOMAIN ); ?></th>
+                <th style="width:140px"><?php esc_html_e( 'Date', MB_TEXT_DOMAIN ); ?></th>
+                <th style="width:100px"><?php esc_html_e( 'Actions', MB_TEXT_DOMAIN ); ?></th>
+              </tr>
+            </thead>
+            <tbody>
+            <?php if ( $purchases ) : foreach ( $purchases as $p ) : ?>
+              <tr>
+                <td><?php echo (int) $p->id; ?></td>
+                <td><code style="font-size:11px"><?php echo esc_html( $p->paypal_order_id ); ?></code></td>
+                <td>
+                  <?php echo esc_html( $p->user_login ?? '—' ); ?>
+                  <?php if ( $p->user_email ) : ?>
+                    <br><small style="color:#888"><?php echo esc_html( $p->user_email ); ?></small>
+                  <?php endif; ?>
+                </td>
+                <td><?php echo esc_html( $p->amount . ' ' . $p->currency ); ?></td>
+                <td><code><?php echo esc_html( $p->activation_code ?: '—' ); ?></code></td>
+                <td>
+                  <?php if ( $p->email_sent ) : ?>
+                    <span style="color:green">✅ Envoyé</span>
+                  <?php else : ?>
+                    <span style="color:#cc0000">✗ Non envoyé</span>
+                  <?php endif; ?>
+                </td>
+                <td><?php echo esc_html( $p->created_at ); ?></td>
+                <td>
+                  <?php if ( $p->activation_code && $p->user_email ) : ?>
+                    <button class="button button-small mb-resend-email-btn"
+                            data-id="<?php echo (int) $p->id; ?>"
+                            data-nonce="<?php echo esc_attr( wp_create_nonce( 'mb_admin_nonce' ) ); ?>">
+                      <?php esc_html_e( 'Renvoyer', MB_TEXT_DOMAIN ); ?>
+                    </button>
+                  <?php endif; ?>
+                </td>
+              </tr>
+            <?php endforeach; else : ?>
+              <tr><td colspan="8"><?php esc_html_e( 'Aucun paiement enregistré.', MB_TEXT_DOMAIN ); ?></td></tr>
+            <?php endif; ?>
+            </tbody>
+          </table>
+        </div>
+        <script>
+        jQuery(function($){
+          $(document).on('click', '.mb-resend-email-btn', function(){
+            var btn = $(this);
+            btn.prop('disabled', true).text('...');
+            $.post(ajaxurl, {
+              action: 'mb_admin_resend_code_email',
+              nonce:  btn.data('nonce'),
+              id:     btn.data('id')
+            }, function(r){
+              if (r.success) {
+                btn.text('✅ Envoyé');
+              } else {
+                btn.prop('disabled', false).text('Réessayer');
+                alert(r.data.message || 'Erreur');
+              }
+            });
+          });
+        });
+        </script>
+        <?php
+    }
+
+    // ── Admin: resend activation code email ───────────────────────────────────
+    public static function handle_resend_code_email() {
+        check_ajax_referer( 'mb_admin_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => 'Accès refusé.' ] );
+            return;
+        }
+
+        $id = isset( $_POST['id'] ) ? (int) $_POST['id'] : 0;
+        if ( ! $id ) {
+            wp_send_json_error( [ 'message' => 'ID invalide.' ] );
+            return;
+        }
+
+        global $wpdb;
+        $purchase = $wpdb->get_row( $wpdb->prepare(
+            "SELECT p.*, u.user_email, u.display_name, u.user_login
+             FROM {$wpdb->prefix}mb_paypal_purchases p
+             LEFT JOIN {$wpdb->users} u ON u.ID = p.user_id
+             WHERE p.id = %d LIMIT 1",
+            $id
+        ) );
+
+        if ( ! $purchase || ! $purchase->activation_code || ! $purchase->user_email ) {
+            wp_send_json_error( [ 'message' => 'Données manquantes pour le renvoi.' ] );
+            return;
+        }
+
+        $name = $purchase->display_name ?: $purchase->user_login ?: $purchase->user_email;
+        $sent = MB_Ajax::send_activation_code_email( $purchase->user_email, $name, $purchase->activation_code );
+
+        if ( $sent ) {
+            $wpdb->update(
+                $wpdb->prefix . 'mb_paypal_purchases',
+                [ 'email_sent' => 1 ],
+                [ 'id' => $id ],
+                [ '%d' ],
+                [ '%d' ]
+            );
+            wp_send_json_success();
+        } else {
+            wp_send_json_error( [ 'message' => 'Échec de l\'envoi — vérifiez la configuration email WordPress.' ] );
+        }
+    }
+
     public static function page_reports() {
         global $wpdb;
         $table = $wpdb->prefix . 'mb_error_reports';
@@ -1177,7 +1312,8 @@ jQuery(function($){
         foreach ( [
             'mb_paypal_client_id', 'mb_paypal_secret', 'mb_price', 'mb_currency',
             'mb_max_sessions', 'mb_free_locked_count', 'mb_premium_duration',
-            'mb_email_contact', 'mb_payment_page_url', 'mb_login_page_url', 'mb_register_page_url', 'mb_allow_register',
+            'mb_email_contact', 'mb_payment_page_url', 'mb_login_page_url', 'mb_register_page_url',
+            'mb_allow_register', 'mb_resources_page_url',
         ] as $opt ) {
             register_setting( 'mb_settings_group', $opt );
         }
@@ -1226,6 +1362,10 @@ jQuery(function($){
                 <td><input type="url" name="mb_register_page_url" value="<?php echo esc_attr( get_option( 'mb_register_page_url' ) ); ?>" class="regular-text"
                            placeholder="https://mathboost.net/inscription/">
                   <p class="description"><?php esc_html_e( 'Page d\'inscription avec formulaire et code d\'activation. Créée automatiquement à l\'activation.', MB_TEXT_DOMAIN ); ?></p></td></tr>
+              <tr><th><?php esc_html_e( 'URL page ressources', MB_TEXT_DOMAIN ); ?></th>
+                <td><input type="url" name="mb_resources_page_url" value="<?php echo esc_attr( get_option( 'mb_resources_page_url' ) ); ?>" class="regular-text"
+                           placeholder="https://mathboost.net/ressources/">
+                  <p class="description"><?php esc_html_e( 'Page contenant [mathboost_resources]. Utilisée pour la redirection après activation d\'un code. Laissez vide pour détection automatique.', MB_TEXT_DOMAIN ); ?></p></td></tr>
             </table>
             <?php submit_button(); ?>
           </form>

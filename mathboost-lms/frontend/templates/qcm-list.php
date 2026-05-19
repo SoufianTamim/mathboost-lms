@@ -98,12 +98,6 @@ $upgrade_url  = apply_filters( 'mb_upgrade_url', '#upgrade' );
               <a class="mb-btn mb-btn-upgrade" href="<?php echo esc_url( $upgrade_url ); ?>">
                 <?php esc_html_e( 'Débloquer', MB_TEXT_DOMAIN ); ?>
               </a>
-            <?php elseif ( ! $is_logged_in ) :
-                $start_url = esc_url( add_query_arg( [ 'mb_cat' => $cat_slug, 'mb_qid' => $qcm->id ], get_permalink() ) );
-              ?>
-              <a class="mb-btn mb-btn-login" href="<?php echo esc_url( wp_login_url( $start_url ) ); ?>">
-                <?php esc_html_e( 'Se connecter', MB_TEXT_DOMAIN ); ?>
-              </a>
             <?php else :
                 $start_url = esc_url( add_query_arg( [ 'mb_cat' => $cat_slug, 'mb_qid' => $qcm->id ], get_permalink() ) );
               ?>

@@ -130,10 +130,6 @@ if ( $filter_term && isset( $cat_groups[ (int) $filter_term->id ] ) ) {
                   <a class="mb-btn mb-btn-upgrade" href="<?php echo esc_url( $upgrade_url ); ?>">
                     🔓 <?php esc_html_e( 'Débloquer', MB_TEXT_DOMAIN ); ?>
                   </a>
-                <?php elseif ( ! $is_logged_in ) : ?>
-                  <a class="mb-btn mb-btn-login" href="<?php echo esc_url( wp_login_url( $start_url ) ); ?>">
-                    <?php esc_html_e( 'Se connecter', MB_TEXT_DOMAIN ); ?>
-                  </a>
                 <?php else : ?>
                   <a class="mb-btn mb-btn-start" href="<?php echo $start_url; ?>">
                     <?php esc_html_e( 'Commencer', MB_TEXT_DOMAIN ); ?> →
