@@ -40,9 +40,18 @@ body.mb-plugin-page .post-header {
 .mb-login-wrap {
   font-family: var(--mb-font);
   color: var(--mb-text);
-  max-width: 900px;
+  max-width: 1300px;
+  width: 100%;
   margin: 0 auto;
-  padding: 28px 18px;
+  padding: 40px 40px;
+}
+
+@media (max-width: 1024px) {
+  .mb-resources-wrap, .mb-course-wrap, .mb-qcm-list-wrap,
+  .qcm-wrap, .mb-locked-wrap, .mb-activation-wrap, .mb-payment-wrap,
+  .mb-login-wrap {
+    padding: 28px 24px;
+  }
 }
 
 /* ── Buttons ──────────────────────────────────────── */
@@ -53,11 +62,11 @@ body.mb-plugin-page .post-header {
   border: none; cursor: pointer; text-decoration: none;
   transition: all .2s; white-space: nowrap;
 }
-.mb-btn-start {
+.mb-btn-start, .mb-btn-primary {
   background: var(--mb-primary); color: #fff;
   box-shadow: 0 3px 12px rgba(87,183,168,.30);
 }
-.mb-btn-start:hover {
+.mb-btn-start:hover, .mb-btn-primary:hover {
   background: var(--mb-primary-dark);
   transform: translateY(-2px);
   box-shadow: 0 6px 18px rgba(87,183,168,.38);
@@ -99,7 +108,7 @@ body.mb-plugin-page .post-header {
 .mb-breadcrumb-top a:hover { background: var(--mb-primary); color: #fff; border-color: var(--mb-primary); }
 
 /* ── Resources / Levels ───────────────────────────── */
-.mb-resources-header { text-align: center; margin-bottom: 36px; }
+.mb-resources-header { text-align: center; margin-bottom: 48px; }
 .mb-resources-title {
   font-size: 30px; font-weight: 800; color: var(--mb-text);
   position: relative; display: inline-block;
@@ -111,14 +120,14 @@ body.mb-plugin-page .post-header {
 }
 .mb-resources-sub { color: var(--mb-text-light); margin-top: 10px; font-size: 15px; }
 
-.mb-level-section { margin-bottom: 32px; }
+.mb-level-section { margin-bottom: 40px; }
 .mb-section-title {
   font-size: 13px; font-weight: 800; text-transform: uppercase;
   letter-spacing: 1.4px; color: var(--mb-primary);
   padding: 0 0 10px; margin-bottom: 14px;
   border-bottom: 2px solid var(--mb-border);
 }
-.mb-level-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 12px; }
+.mb-level-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; }
 .mb-level-card {
   display: flex; align-items: center; justify-content: center;
   padding: 20px 14px; background: var(--mb-card);
@@ -183,7 +192,11 @@ body.mb-plugin-page .post-header {
   color: #fff; border: none;
 }
 
-.mb-qcm-items { display: flex; flex-direction: column; gap: 10px; }
+.mb-qcm-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(520px, 1fr));
+  gap: 12px;
+}
 .mb-qcm-item {
   display: flex; justify-content: space-between; align-items: center;
   padding: 16px 20px; background: var(--mb-card);
@@ -239,7 +252,7 @@ body.mb-plugin-page .post-header {
 /* ── QCM Single / Quiz Player ─────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 
-.qcm-wrap { max-width: 840px; margin: 0 auto; padding: 24px 16px; }
+.qcm-wrap { max-width: 1300px; margin: 0 auto; padding: 40px 40px; }
 
 /* Header */
 .qcm-header {
@@ -432,37 +445,107 @@ body.mb-plugin-page .post-header {
 .mb-locked-code-hint { margin-top: 22px; font-size: 14px; color: var(--mb-text-light); }
 .mb-locked-code-hint a { color: var(--mb-primary); font-weight: 700; }
 
-/* Payment card */
-.mb-payment-card {
+/* ── Payment page — hero + action zone ──────────────── */
+.mb-pay-hero {
+  text-align: center;
+  background: linear-gradient(135deg, var(--mb-primary) 0%, var(--mb-primary-dark) 100%);
+  color: #fff; border-radius: var(--mb-radius); padding: 60px 48px 52px;
+  margin-bottom: 32px;
+}
+.mb-pay-hero-badge {
+  display: inline-block; padding: 5px 18px; border-radius: 20px;
+  background: rgba(255,255,255,.22); font-size: 13px; font-weight: 800;
+  letter-spacing: .5px; margin-bottom: 18px;
+}
+.mb-pay-hero-title {
+  font-size: 34px; font-weight: 900; line-height: 1.2;
+  margin: 0 0 12px; color: #fff;
+}
+.mb-pay-hero-sub {
+  font-size: 16px; opacity: .88; margin: 0 0 28px;
+}
+.mb-pay-price-block {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  background: rgba(255,255,255,.15); border-radius: 16px;
+  padding: 14px 32px; margin-bottom: 32px;
+}
+.mb-pay-price-amount {
+  font-size: 56px; font-weight: 900; color: #fff; line-height: 1;
+}
+.mb-pay-price-label {
+  font-size: 14px; opacity: .8; font-weight: 600;
+}
+.mb-pay-features {
+  list-style: none; margin: 0; padding: 0;
+  display: inline-flex; flex-direction: column; gap: 10px;
+  text-align: left;
+}
+.mb-pay-features li { font-size: 15px; font-weight: 600; opacity: .95; }
+
+/* Action zone */
+.mb-pay-action-zone {
   background: var(--mb-card); border-radius: var(--mb-radius);
-  box-shadow: var(--mb-shadow); padding: 36px; max-width: 500px; margin: 0 auto;
-  border-top: 4px solid var(--mb-primary);
+  box-shadow: var(--mb-shadow); padding: 44px 48px;
+  max-width: 600px; margin: 0 auto; text-align: center;
+  border-top: 4px solid var(--mb-accent);
 }
-.mb-payment-header { margin-bottom: 22px; }
-.mb-payment-badge {
-  display: inline-block; padding: 5px 16px; border-radius: 20px;
-  background: linear-gradient(135deg, var(--mb-primary), var(--mb-primary-dark));
-  color: #fff; font-size: 12px; font-weight: 800; margin-bottom: 10px;
+.mb-pay-cta-label {
+  font-size: 18px; font-weight: 800; color: var(--mb-text);
+  margin-bottom: 20px;
 }
-.mb-payment-title { font-size: 22px; font-weight: 800; margin: 8px 0; }
-.mb-payment-price { font-size: 44px; font-weight: 800; color: var(--mb-accent); }
-.mb-price-unit { font-size: 22px; }
-.mb-payment-desc { color: var(--mb-text-light); font-size: 14px; }
+.mb-pay-security-note {
+  font-size: 13px; color: var(--mb-text-light); margin-top: 16px; line-height: 1.5;
+}
+.mb-pay-guest-block { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.mb-pay-guest-label {
+  font-size: 16px; font-weight: 700; color: var(--mb-text); margin-bottom: 4px;
+}
+.mb-pay-guest-login { font-size: 14px; color: var(--mb-text-light); }
+.mb-pay-guest-login a { color: var(--mb-primary); font-weight: 700; text-decoration: none; }
+.mb-pay-guest-login a:hover { text-decoration: underline; }
+.mb-pay-no-paypal { font-size: 14px; color: var(--mb-text-light); margin-bottom: 20px; }
+.mb-pay-activation-alt { margin-top: 12px; }
+.mb-pay-activation-label {
+  font-size: 15px; font-weight: 700; margin-bottom: 14px; color: var(--mb-text);
+}
+
+/* PayPal loading dots */
+.mb-paypal-loading {
+  padding: 28px 0; color: var(--mb-text-light); font-size: 14px;
+}
+.mb-paypal-loading-dots { display: flex; justify-content: center; gap: 8px; margin-bottom: 10px; }
+.mb-paypal-loading-dots span {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--mb-primary); animation: mb-dot-pulse 1.2s ease-in-out infinite;
+}
+.mb-paypal-loading-dots span:nth-child(2) { animation-delay: .2s; }
+.mb-paypal-loading-dots span:nth-child(3) { animation-delay: .4s; }
+@keyframes mb-dot-pulse {
+  0%, 80%, 100% { opacity: .25; transform: scale(.9); }
+  40%            { opacity: 1;   transform: scale(1.1); }
+}
+
+/* Already premium */
+.mb-already-premium {
+  background: var(--mb-card); border-radius: var(--mb-radius);
+  box-shadow: var(--mb-shadow); padding: 60px 48px; text-align: center;
+  max-width: 560px; margin: 0 auto; border-top: 4px solid var(--mb-primary);
+}
+.mb-already-premium-icon { font-size: 60px; margin-bottom: 16px; }
+.mb-already-premium h2 { font-size: 26px; font-weight: 900; margin-bottom: 12px; }
+.mb-already-premium p { color: var(--mb-text-light); font-size: 15px; margin-bottom: 28px; }
+
+/* Keep these for locked.php reuse */
 .mb-payment-success-card {
-  background: var(--mb-card); padding: 36px; border-radius: var(--mb-radius);
-  box-shadow: var(--mb-shadow); max-width: 400px; margin: 0 auto;
+  background: var(--mb-card); padding: 48px; border-radius: var(--mb-radius);
+  box-shadow: var(--mb-shadow); max-width: 520px; margin: 0 auto; text-align: center;
   border-top: 4px solid var(--mb-primary);
-}
-.mb-payment-login-note {
-  padding: 12px 16px; background: #fef3ee; border-radius: 10px;
-  margin-bottom: 16px; font-size: 14px; color: var(--mb-accent);
-  border-left: 3px solid var(--mb-accent);
 }
 
 /* ── Activation form ──────────────────────────────── */
 .mb-activation-card {
-  background: var(--mb-card); padding: 36px; border-radius: var(--mb-radius);
-  box-shadow: var(--mb-shadow); max-width: 500px; margin: 0 auto; text-align: center;
+  background: var(--mb-card); padding: 48px 52px; border-radius: var(--mb-radius);
+  box-shadow: var(--mb-shadow); max-width: 600px; margin: 0 auto; text-align: center;
   border-top: 4px solid var(--mb-primary);
 }
 .mb-activation-icon { font-size: 44px; margin-bottom: 10px; }
@@ -537,7 +620,7 @@ body.mb-plugin-page .post-header {
 .mb-list-cat-card:hover { transform: translateY(-3px); border-color: var(--mb-primary); color: var(--mb-primary); }
 
 /* ── Login / Register ─────────────────────────────── */
-.mb-login-wrap { max-width: 480px; }
+.mb-login-wrap { max-width: 540px; }
 .mb-login-card {
   background: var(--mb-card); border-radius: var(--mb-radius);
   box-shadow: var(--mb-shadow); overflow: hidden;
@@ -651,7 +734,24 @@ body.mb-plugin-page .post-header {
 }
 
 /* ── Responsive ───────────────────────────────────── */
+@media (max-width: 900px) {
+  .mb-qcm-items {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 600px) {
+  .mb-resources-wrap, .mb-course-wrap, .mb-qcm-list-wrap,
+  .qcm-wrap, .mb-locked-wrap, .mb-activation-wrap, .mb-payment-wrap,
+  .mb-login-wrap {
+    padding: 20px 14px;
+  }
+  .qcm-wrap { padding: 16px 12px; }
+  .mb-activation-card { padding: 28px 20px; }
+  .mb-pay-hero { padding: 40px 22px 36px; }
+  .mb-pay-hero-title { font-size: 24px; }
+  .mb-pay-price-amount { font-size: 42px; }
+  .mb-pay-action-zone { padding: 32px 20px; }
   .mb-qcm-item { flex-direction: column; align-items: flex-start; gap: 10px; }
   .mb-qcm-item-right { align-self: flex-end; }
   .mb-qcm-list-header { flex-direction: column; gap: 10px; }
@@ -659,6 +759,7 @@ body.mb-plugin-page .post-header {
   .mb-upgrade-cta-inner { flex-direction: column; text-align: center; }
   .qcm-score-bar { flex-wrap: wrap; }
   .bilan-actions { flex-direction: column; }
-  .mb-level-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
-  .mb-login-panel { padding: 22px 20px 28px; }
+  .mb-level-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+  .mb-login-panel { padding: 22px 18px 28px; }
+  .mb-login-wrap { max-width: 100%; }
 }

@@ -309,6 +309,7 @@
     var cfg       = window.MB_PAYPAL;
     var container = document.getElementById('mb-paypal-container');
     var status    = document.getElementById('mb-paypal-status');
+    var loading   = document.getElementById('mb-paypal-loading');
     if (!container) return;
 
     function showStatus(success, msg) {
@@ -319,7 +320,11 @@
     }
 
     window.paypal.Buttons({
-      style: { layout: 'vertical', color: 'blue', shape: 'rect', label: 'pay' },
+      style: { layout: 'vertical', color: 'gold', shape: 'pill', label: 'pay', height: 55 },
+
+      onInit: function () {
+        if (loading) loading.style.display = 'none';
+      },
 
       createOrder: function (data, actions) {
         return actions.order.create({
@@ -331,7 +336,7 @@
       },
 
       onApprove: function (data, actions) {
-        showStatus(true, 'Traitement en cours…');
+        showStatus(true, '⏳ Traitement en cours…');
         return actions.order.capture().then(function () {
           var fd = new FormData();
           fd.append('action',   'mb_paypal_confirm');
@@ -340,11 +345,16 @@
           return fetch(cfg.ajaxUrl, { method: 'POST', body: fd })
             .then(function (r) { return r.json(); })
             .then(function (r) {
-              showStatus(r.success, r.data ? r.data.message : 'Erreur inattendue.');
-              if (r.success) setTimeout(function () { location.reload(); }, 2500);
+              if (r.success) {
+                showStatus(true, '🎉 Paiement confirmé ! Votre code d\'activation vous a été envoyé par email. Redirection…');
+                var dest = (window.mbConfig && window.mbConfig.resourcesUrl) ? window.mbConfig.resourcesUrl : cfg.redirect;
+                setTimeout(function () { window.location.href = dest; }, 3000);
+              } else {
+                showStatus(false, r.data ? r.data.message : 'Erreur inattendue.');
+              }
             })
             .catch(function () {
-              showStatus(false, 'Erreur réseau. Votre paiement a été reçu — contactez le support si l\'accès n\'est pas activé.');
+              showStatus(false, '⚠️ Erreur réseau. Votre paiement a été reçu — contactez le support si l\'accès n\'est pas activé.');
             });
         });
       },
